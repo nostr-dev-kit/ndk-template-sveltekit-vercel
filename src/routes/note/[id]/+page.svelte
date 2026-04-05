@@ -10,7 +10,7 @@
     articleSummary,
     articleTitle,
     articleTopics,
-    cleanText,
+    displayNip05,
     displayName,
     formatDisplayDate,
     noteExcerpt,
@@ -24,7 +24,7 @@
   const isArticle = $derived(event?.kind === 30023);
   const authorName = $derived(displayName(data.profile, 'Author'));
   const authorIdentity = $derived.by(() => {
-    const nip05 = cleanText(data.profile?.nip05);
+    const nip05 = displayNip05(data.profile);
     return nip05 && nip05 !== authorName ? nip05 : '';
   });
 </script>
