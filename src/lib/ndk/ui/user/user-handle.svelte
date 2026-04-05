@@ -21,15 +21,11 @@
 
   const handle = $derived.by(() => {
     if (context.profile?.name) return context.profile.name;
-
-    try {
-      return context.ndkUser?.pubkey?.slice(0, 8) || 'unknown';
-    } catch {
-      return 'unknown';
-    }
+    if (context.profile?.nip05) return context.profile.nip05.split('@')[0] ?? '';
+    return '';
   });
 
-  const displayText = $derived(showAt ? `@${handle}` : handle);
+  const displayText = $derived(handle ? (showAt ? `@${handle}` : handle) : '');
 </script>
 
 <span data-user-handle="" class={cn(className)}>

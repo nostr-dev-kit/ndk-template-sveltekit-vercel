@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { NDKEvent } from '@nostr-dev-kit/ndk';
   import type { NDKSvelte } from '@nostr-dev-kit/svelte';
-  import { noteExcerpt, noteTitle, shortPubkey } from '../../format';
+  import { noteExcerpt, noteTitle } from '../../format';
 
   interface Props {
     ndk: NDKSvelte;
@@ -25,7 +25,7 @@
     <span class="embedded-kind">Referenced note</span>
     <strong>{noteTitle(event.rawEvent())}</strong>
     <span class="embedded-copy">{noteExcerpt(event.content, 140)}</span>
-    <span class="embedded-meta">{shortPubkey(event.pubkey)}</span>
+    <span class="embedded-meta">Open note</span>
   </a>
 {:else}
   <span data-embedded-note="" class={`embedded-card ${className}`}>

@@ -1,6 +1,7 @@
 import type { NostrEvent } from '@nostr-dev-kit/ndk';
 import type { PageServerLoad } from './$types';
 import { fetchNoteWithAuthor } from '$lib/server/nostr';
+import { profileIdentifier } from '$lib/ndk/format';
 import { buildMissingSeo, buildNoteSeo } from '$lib/seo';
 
 export const load: PageServerLoad = async ({ params, setHeaders, url }) => {
@@ -22,10 +23,12 @@ export const load: PageServerLoad = async ({ params, setHeaders, url }) => {
       missing: false,
       event: event.rawEvent() as NostrEvent,
       authorPubkey: author.pubkey,
+      authorIdentifier: profileIdentifier(profile, author.npub),
       authorNpub: author.npub,
       profile,
       seo: buildNoteSeo({
         url,
+        identifier: params.id,
         event: event.rawEvent() as NostrEvent,
         authorPubkey: author.pubkey,
         profile

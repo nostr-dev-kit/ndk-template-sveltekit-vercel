@@ -12,7 +12,7 @@ export function displayName(profile: NDKUserProfile | undefined, fallback: strin
   const candidate =
     cleanText(profile?.displayName) ||
     cleanText(profile?.name) ||
-    cleanText(profile?.nip05) ||
+    displayNip05(profile) ||
     fallback;
 
   return candidate;
@@ -33,7 +33,11 @@ export function noteExcerpt(content: string, maxLength = 220): string {
   const normalized = cleanText(
     content
       .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+      .replace(/^\s*>\s?/gm, '')
+      .replace(/^\s*[-*+]\s+/gm, '')
       .replace(/\[(.*?)\]\((.*?)\)/g, '$1')
+      .replace(/[*_~`]+/g, '')
       .replace(/\s+/g, ' ')
   );
 
@@ -47,6 +51,16 @@ export function articleTitle(event: EventWithContent): string {
 export function articleSummary(event: EventWithTiming, maxLength = 220): string {
   const summary = cleanText(tagValue(event.tags, 'summary'));
   return summary || noteExcerpt(event.content, maxLength);
+}
+
+export function articleImageUrl(event: Pick<NostrEvent, 'tags'>): string | undefined {
+  const candidate =
+    cleanText(tagValue(event.tags, 'image')) ||
+    cleanText(tagValue(event.tags, 'thumb')) ||
+    cleanText(tagValue(event.tags, 'thumbnail')) ||
+    cleanText(tagValue(event.tags, 'cover'));
+
+  return candidate || undefined;
 }
 
 export function articleTopics(event: Pick<NostrEvent, 'tags'>, limit = 4): string[] {
@@ -104,6 +118,16 @@ export function truncate(value: string, maxLength: number): string {
 export function avatarUrl(profile: NDKUserProfile | undefined): string | undefined {
   const candidate = cleanText(profile?.picture) || cleanText(profile?.image);
   return candidate || undefined;
+}
+
+export function displayNip05(profile: NDKUserProfile | undefined): string {
+  const nip05 = cleanText(profile?.nip05);
+  return nip05.replace(/^_@/, '');
+}
+
+export function profileIdentifier(profile: NDKUserProfile | undefined, fallback: string): string {
+  const nip05 = displayNip05(profile);
+  return nip05 || fallback;
 }
 
 function tagValue(tags: string[][], name: string): string | undefined {

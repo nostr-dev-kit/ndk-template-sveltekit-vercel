@@ -75,7 +75,7 @@
 {:else if FallbackHandler && wrappedEvent}
   <FallbackHandler {ndk} event={wrappedEvent} class={className} />
 {:else if wrappedEvent}
-  nostr:{bech32}
+  Referenced post
 {/if}
 
 <style>

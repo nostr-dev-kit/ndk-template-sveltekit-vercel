@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import { onMount, setContext } from 'svelte';
   import type { LayoutProps } from './$types';
   import '../app.css';
@@ -8,8 +9,8 @@
   import type { SeoMetadata } from '$lib/seo';
   import { NDK_CONTEXT_KEY } from '$lib/ndk/utils/ndk';
 
-  let { children, data }: LayoutProps = $props();
-  const seo = $derived((data as { seo?: SeoMetadata }).seo);
+  let { children }: LayoutProps = $props();
+  const seo = $derived((page.data as { seo?: SeoMetadata }).seo);
 
   setContext(NDK_CONTEXT_KEY, ndk);
 
@@ -32,14 +33,13 @@
       <span class="brand-mark">R</span>
       <span class="brand-copy">
         <span class="brand-name">Relay Press</span>
-        <span class="brand-note">Long-form Nostr demo built from the template</span>
+        <span class="brand-note">Long-form writing on Nostr</span>
       </span>
     </a>
 
     <div class="nav-links">
       <a href="/">Read</a>
-      <a href="/about">About the template</a>
-      <a href="/profile/fiatjaf.com">Author page</a>
+      <a href="/about">About</a>
     </div>
 
     <LoginPanel />
@@ -52,7 +52,7 @@
 
 <footer class="shell footer">
   <div class="footer-grid">
-    <span>A long-form Nostr demo that keeps shareable routes separate from live client state.</span>
-    <span>Relays are configured through <kbd>PUBLIC_NOSTR_RELAYS</kbd>.</span>
+    <span>Read essays, dispatches, and notes from Nostr.</span>
+    <span><a href="/about">About Relay Press</a></span>
   </div>
 </footer>

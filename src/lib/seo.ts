@@ -1,6 +1,15 @@
 import type { NDKUserProfile, NostrEvent } from '@nostr-dev-kit/ndk';
 import { APP_NAME, APP_TAGLINE } from '$lib/ndk/config';
-import { avatarUrl, displayName, noteExcerpt, noteTitle, shortPubkey, truncate } from '$lib/ndk/format';
+import {
+  articleSummary,
+  avatarUrl,
+  cleanText,
+  displayNip05,
+  displayName,
+  noteExcerpt,
+  noteTitle,
+  truncate
+} from '$lib/ndk/format';
 
 export const SITE_NAME = APP_NAME;
 export const DEFAULT_SOCIAL_IMAGE_PATH = '/og-default.png';
@@ -38,12 +47,12 @@ export function buildHomeSeo(url: URL): SeoMetadata {
 
 export function buildAboutSeo(url: URL): SeoMetadata {
   return {
-    title: `About the Template • ${SITE_NAME}`,
+    title: `About ${SITE_NAME}`,
     description:
-      'A SvelteKit starter for long-form Nostr apps that need server-rendered routes, login, preview metadata, and a straightforward Vercel deployment path.',
+      'Learn how Relay Press keeps long-form writing readable, shareable, and easy to revisit.',
     canonical: canonicalUrl(url),
     type: 'website',
-    image: defaultImage(url, `${SITE_NAME} template preview`)
+    image: defaultImage(url, `${SITE_NAME} preview`)
   };
 }
 
@@ -52,13 +61,13 @@ export function buildProfileSeo(args: {
   pubkey: string;
   profile?: NDKUserProfile;
 }): SeoMetadata {
-  const name = displayName(args.profile, shortPubkey(args.pubkey));
+  const name = displayName(args.profile, 'Author');
   const about = cleanSnippet(args.profile?.about || args.profile?.bio);
   const imageUrl = avatarUrl(args.profile);
 
   return {
     title: `${name} • ${SITE_NAME}`,
-    description: about || `${name}'s Nostr profile and recent writing, rendered server-side with SvelteKit.`,
+    description: about || `${name}'s profile and recent writing on ${SITE_NAME}.`,
     canonical: canonicalUrl(args.url),
     type: 'profile',
     image: imageUrl
@@ -68,26 +77,36 @@ export function buildProfileSeo(args: {
         }
       : defaultImage(args.url, `${name} profile preview`),
     author: name,
-    username: args.profile?.name || args.profile?.nip05 || undefined
+    username: cleanText(args.profile?.name) || displayNip05(args.profile) || undefined
   };
 }
 
 export function buildNoteSeo(args: {
   url: URL;
+  identifier: string;
   event: NostrEvent;
   authorPubkey: string;
   profile?: NDKUserProfile;
 }): SeoMetadata {
-  const authorName = displayName(args.profile, shortPubkey(args.authorPubkey));
+  const authorName = displayName(args.profile, 'Author');
   const title = noteTitle(args.event);
-  const description = truncate(`${authorName}: ${noteExcerpt(args.event.content, 180)}`, 190);
+  const previewCopy =
+    args.event.kind === 30023
+      ? previewSnippet(articleSummary(args.event, 220), noteExcerpt(args.event.content, 180))
+      : previewSnippet(noteExcerpt(args.event.content, 220), 'A note shared over Nostr.');
+  const description = truncate(`${authorName}: ${previewCopy}`, 190);
 
   return {
     title: `${title} • ${SITE_NAME}`,
     description,
     canonical: canonicalUrl(args.url),
     type: args.event.kind === 30023 ? 'article' : 'website',
-    image: defaultImage(args.url, `${title} preview`),
+    image: {
+      url: noteImage(args.url, args.identifier),
+      alt: `${title} preview`,
+      width: DEFAULT_SOCIAL_IMAGE_WIDTH,
+      height: DEFAULT_SOCIAL_IMAGE_HEIGHT
+    },
     author: authorName,
     publishedTime: args.event.created_at
       ? new Date(args.event.created_at * 1000).toISOString()
@@ -98,7 +117,7 @@ export function buildNoteSeo(args: {
 export function buildMissingSeo(url: URL, label: string): SeoMetadata {
   return {
     title: `${label} • ${SITE_NAME}`,
-    description: `The requested resource could not be loaded from the configured Nostr relays.`,
+    description: 'The page you requested is not available right now.',
     canonical: canonicalUrl(url),
     type: 'website',
     image: defaultImage(url, `${label} preview`),
@@ -115,11 +134,29 @@ function defaultImage(url: URL, alt: string): SeoImage {
   };
 }
 
+function noteImage(url: URL, identifier: string): string {
+  return new URL(`/og/note/${encodeURIComponent(identifier)}`, url.origin).toString();
+}
+
 function canonicalUrl(url: URL): string {
   return new URL(url.pathname + url.search, url.origin).toString();
 }
 
 function cleanSnippet(value: string | undefined): string | undefined {
   if (!value) return undefined;
-  return truncate(value.replace(/\s+/g, ' ').trim(), 180) || undefined;
+  const normalized = cleanText(value);
+  if (!normalized || normalized === '~' || normalized === '-' || normalized === '_') {
+    return undefined;
+  }
+  return truncate(normalized, 180) || undefined;
+}
+
+function previewSnippet(value: string, fallback: string): string {
+  const sanitized = cleanText(
+    value
+      .replace(/\(\s*https?:\/\/[^)]+\)/g, ' ')
+      .replace(/https?:\/\/\S+/g, ' ')
+      .replace(/\(\s*\)/g, ' ')
+  );
+  return sanitized || fallback;
 }

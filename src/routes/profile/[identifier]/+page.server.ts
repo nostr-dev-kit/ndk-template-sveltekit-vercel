@@ -19,7 +19,7 @@ export const load: PageServerLoad = async ({ params, setHeaders, url }) => {
       };
     }
 
-    const articles = await fetchRecentArticlesByAuthor(user.pubkey, 8);
+    const articles = await fetchRecentArticlesByAuthor(user.pubkey, 12);
 
     return {
       missing: false,

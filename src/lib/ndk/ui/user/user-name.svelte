@@ -5,12 +5,14 @@
 
   interface Props {
     field?: 'displayName' | 'name' | 'both';
+    fallback?: string;
 
     class?: string;
   }
 
   let {
     field = 'displayName',
+    fallback = 'Someone',
     class: className = ''
   }: Props = $props();
 
@@ -19,31 +21,26 @@
     throw new Error('User.Name must be used within User.Root');
   }
 
-  const userPubkey = $derived.by(() => {
-    if (context.ndkUser) {
-      try {
-        return context.ndkUser.pubkey;
-      } catch {
-        return undefined;
-      }
-    }
-    return undefined;
-  });
-
   const displayText = $derived.by(() => {
-    if (!context.profile) return userPubkey?.slice(0, 8) + '...' || 'Unknown';
+    if (!context.profile) return fallback;
 
     if (field === 'name') {
-      return context.profile.name || userPubkey?.slice(0, 8) + '...';
+      return context.profile.name || context.profile.displayName || context.profile.nip05 || fallback;
     } else if (field === 'displayName') {
-      return context.profile.displayName || context.profile.name || userPubkey?.slice(0, 8) + '...';
+      return context.profile.displayName || context.profile.name || context.profile.nip05 || fallback;
     } else if (field === 'both') {
-      const displayName = context.profile.displayName || context.profile.name;
-      const name = context.profile.name && context.profile.name !== context.profile.displayName ? context.profile.name : null;
-      return name ? `${displayName} (@${name})` : displayName || userPubkey?.slice(0, 8) + '...';
+      const primary = context.profile.displayName || context.profile.name;
+      const secondary =
+        context.profile.displayName &&
+        context.profile.name &&
+        context.profile.name !== context.profile.displayName
+          ? context.profile.name
+          : null;
+
+      return secondary ? `${primary} (@${secondary})` : primary || context.profile.nip05 || fallback;
     }
 
-    return userPubkey?.slice(0, 8) + '...' || 'Unknown';
+    return fallback;
   });
 </script>
 

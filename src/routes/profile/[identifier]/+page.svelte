@@ -5,14 +5,16 @@
   import { User } from '$lib/ndk/ui/user';
   import { reveal } from '$lib/actions/reveal';
   import {
+    articleImageUrl,
     articlePublishedAt,
     articleReadTimeMinutes,
     articleSummary,
     articleTitle,
     articleTopics,
+    cleanText,
+    displayNip05,
     displayName,
-    formatDisplayDate,
-    shortPubkey
+    formatDisplayDate
   } from '$lib/ndk/format';
   import { ndk } from '$lib/ndk/client';
 
@@ -22,7 +24,7 @@
     if (!browser || !data.pubkey) return undefined;
 
     return {
-      filters: [{ kinds: [30023], authors: [data.pubkey], limit: 8 }]
+      filters: [{ kinds: [30023], authors: [data.pubkey], limit: 12 }]
     };
   });
 
@@ -31,123 +33,280 @@
   );
 
   const articles = $derived(liveArticles.events.length > 0 ? liveArticles.events : seedArticles);
-  const name = $derived(data.pubkey ? displayName(data.profile, shortPubkey(data.pubkey)) : data.identifier);
+  const featuredArticle = $derived(articles[0]);
+  const moreArticles = $derived(featuredArticle ? articles.slice(1) : []);
+  const name = $derived(data.pubkey ? displayName(data.profile, 'Author') : 'Author');
+  const bio = $derived.by(() => {
+    const candidate = cleanText(data.profile?.about) || cleanText(data.profile?.bio);
+    if (!candidate || candidate === '~' || candidate === '-' || candidate === '_') {
+      return 'Recent writing collected here.';
+    }
+    return candidate;
+  });
+  const handle = $derived(cleanText(typeof data.profile?.name === 'string' ? data.profile.name : ''));
+  const nip05 = $derived(displayNip05(data.profile));
+  const website = $derived(cleanText(typeof data.profile?.website === 'string' ? data.profile.website : ''));
+  const location = $derived(cleanText(typeof data.profile?.location === 'string' ? data.profile.location : ''));
+  const storyCountLabel = $derived(`${articles.length} ${articles.length === 1 ? 'story' : 'stories'}`);
+  const focusTopics = $derived(
+    [...new Set(articles.flatMap((event) => articleTopics(event.rawEvent(), 4)))].slice(0, 8)
+  );
+  const latestDateLabel = $derived(
+    featuredArticle ? formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent())) : ''
+  );
+  const featuredImageUrl = $derived(
+    featuredArticle ? articleImageUrl(featuredArticle.rawEvent()) : undefined
+  );
+
+  function websiteLabel(url: string): string {
+    try {
+      return new URL(url).hostname.replace(/^www\./, '');
+    } catch {
+      return url;
+    }
+  }
+
+  function imageUrlFor(event: NDKEvent): string | undefined {
+    return articleImageUrl(event.rawEvent());
+  }
 </script>
 
 {#if data.missing}
   <section class="section reveal" use:reveal>
     <article class="panel stack">
       <span class="eyebrow eyebrow-red">Missing profile</span>
-      <h1>We could not resolve `{data.identifier}`</h1>
-      <p class="muted" style="margin: 0;">
-        Try an <kbd>npub</kbd>, a hex pubkey, or a NIP-05 identifier that is visible on the
-        configured relays.
-      </p>
+      <h1>We could not find that profile</h1>
+      <p class="muted" style="margin: 0;">Try a different profile link or come back in a moment.</p>
     </article>
   </section>
 {:else}
-  <section class="section bento">
-    <article class="panel span-8 reveal" use:reveal>
-      <div class="profile-header">
+  <section class="section reveal" use:reveal>
+    <article class="panel author-stage">
+      <div class="author-banner">
         <User.Root {ndk} pubkey={data.pubkey} profile={data.profile}>
-          <User.Avatar class="profile-avatar" />
-          <div class="profile-copy">
-            <span class="eyebrow eyebrow-blue">Server profile</span>
-            <h1><User.Name field="both" /></h1>
-            <p class="muted" style="margin: 0; max-width: 42rem;">
-              {data.profile?.about || data.profile?.bio || 'The server resolves this profile before the browser connects to relays.'}
-            </p>
-            <div class="profile-meta-row">
-              <User.Handle class="mono-inline" />
-              {#if data.profile?.nip05}
-                <User.Nip05 class="mono-inline" showVerified={false} />
+          <User.Banner class="author-banner-media" />
+        </User.Root>
+        <div class="author-banner-wash" aria-hidden="true"></div>
+      </div>
+
+      <div class="author-stage-body">
+        <div class="author-id-row">
+          <User.Root {ndk} pubkey={data.pubkey} profile={data.profile}>
+            <User.Avatar class="profile-avatar author-avatar" />
+          </User.Root>
+
+          <div class="author-id-copy">
+            <span class="eyebrow eyebrow-blue">Essays</span>
+            <h1>{name}</h1>
+            <p class="author-bio">{bio}</p>
+
+            <div class="author-link-row">
+              {#if handle}
+                <span class="mono-inline">@{handle}</span>
+              {/if}
+              {#if nip05}
+                <span class="mono-inline">{nip05}</span>
+              {/if}
+              {#if location}
+                <span class="muted">{location}</span>
               {/if}
             </div>
           </div>
-        </User.Root>
-      </div>
-
-      <div class="definition-list">
-        <div class="definition-row">
-          <span>npub</span>
-          <div class="mono-block">{data.npub}</div>
-        </div>
-        <div class="definition-row">
-          <span>pubkey</span>
-          <div class="mono-block">{shortPubkey(data.pubkey ?? data.identifier)}</div>
-        </div>
-        {#if data.profile?.website}
-          <div class="definition-row">
-            <span>Website</span>
-            <p><a class="button-link" href={data.profile.website} target="_blank" rel="noopener noreferrer">{data.profile.website}</a></p>
-          </div>
-        {/if}
-      </div>
-    </article>
-
-    <aside class="panel span-4 reveal" style="--index: 1;" use:reveal>
-      <span class="eyebrow eyebrow-yellow">Why SSR</span>
-      <h3>This route is shaped for crawlers first.</h3>
-      <div class="definition-list">
-        <div class="definition-row">
-          <span>Fetch</span>
-          <p>The server resolves the profile and the first shelf of long-form articles.</p>
-        </div>
-        <div class="definition-row">
-          <span>SEO</span>
-          <p>Canonical, Open Graph, and Twitter tags are sent in the first response.</p>
-        </div>
-        <div class="definition-row">
-          <span>Client</span>
-          <p>The browser can still replace seeded articles with live subscriptions after hydration.</p>
-        </div>
-      </div>
-    </aside>
-  </section>
-
-  <section class="section reveal" use:reveal style="--index: 2;">
-    <div class="panel stack">
-      <div class="panel-header">
-        <span class="eyebrow eyebrow-green">Articles</span>
-        <h2>Latest writing by {name}</h2>
-      </div>
-
-      <div class="window">
-        <div class="window-chrome">
-          <span class="window-controls" aria-hidden="true">
-            <span class="window-dot"></span>
-            <span class="window-dot"></span>
-            <span class="window-dot"></span>
-          </span>
-          <span>Recent long-form articles</span>
-          <kbd>{articles.length} items</kbd>
         </div>
 
-        <div class="window-body">
-          {#if articles.length > 0}
-            {#each articles as event, index}
-              <article class="feed-row article-row reveal" style={`--index: ${index};`} use:reveal>
-                <div class="feed-meta">
-                  <span>{formatDisplayDate(articlePublishedAt(event.rawEvent()))}</span>
-                  <span>{articleReadTimeMinutes(event.content)} min read</span>
-                  <a href={`/note/${event.encode()}`}>Article route</a>
-                </div>
-                <h3 class="feed-title">{articleTitle(event.rawEvent())}</h3>
-                <p class="feed-text">{articleSummary(event.rawEvent())}</p>
-                <div class="topic-row">
-                  {#each articleTopics(event.rawEvent(), 3) as topic}
-                    <span class="status-pill status-blue">{topic}</span>
-                  {/each}
-                </div>
-              </article>
-            {/each}
-          {:else}
-            <div class="feed-row">
-              <p class="muted" style="margin: 0;">No long-form articles loaded for this author yet.</p>
+        <div class="author-stage-side">
+          <div class="author-stat-strip">
+            <div class="author-stat">
+              <span>Stories</span>
+              <strong>{storyCountLabel}</strong>
             </div>
+
+            {#if latestDateLabel}
+              <div class="author-stat">
+                <span>Latest</span>
+                <strong>{latestDateLabel}</strong>
+              </div>
+            {/if}
+
+            {#if focusTopics.length > 0}
+              <div class="author-stat">
+                <span>Focus</span>
+                <strong>{focusTopics[0]}</strong>
+              </div>
+            {/if}
+          </div>
+
+          {#if website}
+            <a class="button-secondary" href={website} target="_blank" rel="noopener noreferrer">
+              Visit {websiteLabel(website)}
+            </a>
           {/if}
         </div>
       </div>
+
+      <nav class="author-nav" aria-label="Profile sections">
+        <a href="#stories">Stories</a>
+        <a href="#about">About</a>
+      </nav>
+    </article>
+  </section>
+
+  <section class="section bento author-publication">
+    <div class="span-8 stack" id="stories">
+      <div class="section-intro reveal" use:reveal>
+        <span class="eyebrow eyebrow-green">Stories</span>
+        <h2>Latest writing</h2>
+        <p class="caption" style="margin: 0;">Newest first.</p>
+      </div>
+
+      {#if featuredArticle}
+        <a class="panel story-link-card author-lead-story reveal" href={`/note/${featuredArticle.encode()}`} use:reveal>
+          <div class="author-lead-copy">
+            <div class="story-kicker-row">
+              <span class="eyebrow eyebrow-blue">Latest</span>
+              <div class="story-pub-meta">
+                <span>{formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent()))}</span>
+                <span>{articleReadTimeMinutes(featuredArticle.content)} min read</span>
+              </div>
+            </div>
+
+            <h2>{articleTitle(featuredArticle.rawEvent())}</h2>
+            <p class="lead-deck">{articleSummary(featuredArticle.rawEvent(), 360)}</p>
+
+            <div class="topic-row">
+              {#each articleTopics(featuredArticle.rawEvent(), 4) as topic}
+                <span class="status-pill status-blue">{topic}</span>
+              {/each}
+            </div>
+          </div>
+
+          {#if featuredImageUrl}
+            <img
+              class="author-story-thumb author-story-thumb-large"
+              src={featuredImageUrl}
+              alt=""
+              loading="lazy"
+            />
+          {/if}
+        </a>
+      {/if}
+
+      <div class="panel author-feed reveal" style="--index: 1;" use:reveal>
+        {#if moreArticles.length > 0}
+          {#each moreArticles as event, index}
+            <a
+              class="author-feed-row"
+              href={`/note/${event.encode()}`}
+              style={`--index: ${index};`}
+            >
+              <div class="author-story-copy">
+                <div class="story-pub-meta">
+                  <span>{formatDisplayDate(articlePublishedAt(event.rawEvent()))}</span>
+                  <span>{articleReadTimeMinutes(event.content)} min read</span>
+                </div>
+                <h3>{articleTitle(event.rawEvent())}</h3>
+                <p>{articleSummary(event.rawEvent(), 220)}</p>
+                <div class="topic-row">
+                  {#each articleTopics(event.rawEvent(), 3) as topic}
+                    <span class="status-pill status-yellow">{topic}</span>
+                  {/each}
+                </div>
+              </div>
+
+              {#if imageUrlFor(event)}
+                <img class="author-story-thumb" src={imageUrlFor(event)} alt="" loading="lazy" />
+              {/if}
+            </a>
+          {/each}
+        {:else if featuredArticle}
+          <p class="muted" style="margin: 0;">No additional stories are loaded for this author yet.</p>
+        {:else}
+          <p class="muted" style="margin: 0;">No long-form articles loaded for this author yet.</p>
+        {/if}
+      </div>
     </div>
+
+    <aside class="span-4 author-sidebar reveal" style="--index: 2;" use:reveal id="about">
+      <article class="panel author-sidebar-card">
+        <div class="section-intro">
+          <span class="eyebrow eyebrow-yellow">About</span>
+          <h3>{name}</h3>
+        </div>
+
+        <p class="muted author-side-note">{bio}</p>
+
+        <div class="author-side-links">
+          {#if website}
+            <a class="button-secondary" href={website} target="_blank" rel="noopener noreferrer">
+              {websiteLabel(website)}
+            </a>
+          {/if}
+          {#if nip05}
+            <span class="mono-inline">{nip05}</span>
+          {/if}
+          {#if location}
+            <span class="muted">{location}</span>
+          {/if}
+        </div>
+      </article>
+
+      {#if focusTopics.length > 0}
+        <article class="panel author-sidebar-card">
+          <div class="section-intro">
+            <span class="eyebrow eyebrow-green">Topics</span>
+            <h3>Often writing about</h3>
+          </div>
+
+          <div class="topic-row">
+            {#each focusTopics as topic}
+              <span class="status-pill status-green">{topic}</span>
+            {/each}
+          </div>
+        </article>
+      {/if}
+
+      <article class="panel author-sidebar-card">
+        <div class="section-intro">
+          <span class="eyebrow eyebrow-red">Overview</span>
+          <h3>Catalog</h3>
+        </div>
+
+        <div class="definition-list">
+          <div class="definition-row">
+            <span>Stories</span>
+            <p>{storyCountLabel}</p>
+          </div>
+          {#if latestDateLabel}
+            <div class="definition-row">
+              <span>Latest</span>
+              <p>{latestDateLabel}</p>
+            </div>
+          {/if}
+          {#if focusTopics.length > 0}
+            <div class="definition-row">
+              <span>Topics</span>
+              <p>{focusTopics.slice(0, 3).join(' · ')}</p>
+            </div>
+          {/if}
+        </div>
+      </article>
+
+      {#if featuredArticle}
+        <article class="panel author-sidebar-card">
+          <div class="section-intro">
+            <span class="eyebrow eyebrow-blue">Latest</span>
+            <h3>Start here</h3>
+          </div>
+
+          <a class="author-sidebar-story" href={`/note/${featuredArticle.encode()}`}>
+            <strong>{articleTitle(featuredArticle.rawEvent())}</strong>
+            <span class="story-pub-meta">
+              <span>{formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent()))}</span>
+              <span>{articleReadTimeMinutes(featuredArticle.content)} min read</span>
+            </span>
+          </a>
+        </article>
+      {/if}
+    </aside>
   </section>
 {/if}

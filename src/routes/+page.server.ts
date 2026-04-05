@@ -1,7 +1,7 @@
 import type { NostrEvent } from '@nostr-dev-kit/ndk';
 import type { PageServerLoad } from './$types';
 import { buildHomeSeo } from '$lib/seo';
-import { fetchRecentArticles } from '$lib/server/nostr';
+import { fetchFrontPageArticles } from '$lib/server/nostr';
 
 export const load: PageServerLoad = async ({ setHeaders, url }) => {
   setHeaders({
@@ -9,7 +9,7 @@ export const load: PageServerLoad = async ({ setHeaders, url }) => {
   });
 
   try {
-    const articles = await fetchRecentArticles(9);
+    const articles = await fetchFrontPageArticles(12);
 
     return {
       articles: articles.map((event) => event.rawEvent() as NostrEvent),

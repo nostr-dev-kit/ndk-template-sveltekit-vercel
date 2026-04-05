@@ -1,6 +1,6 @@
 export const APP_NAME = 'Relay Press';
 export const APP_TAGLINE =
-  'Long-form Nostr reading with SSR, browser login, and preview-safe metadata.';
+  'A calm place to read and share long-form writing from Nostr.';
 
 const FALLBACK_RELAYS = [
   'wss://relay.damus.io',

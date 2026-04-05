@@ -6,8 +6,7 @@
     articleReadTimeMinutes,
     articleSummary,
     articleTitle,
-    formatDisplayDate,
-    shortPubkey
+    formatDisplayDate
   } from '../../format';
 
   interface Props {
@@ -33,7 +32,7 @@
     <strong>{articleTitle(event.rawEvent())}</strong>
     <span class="embedded-copy">{articleSummary(event.rawEvent(), 160)}</span>
     <span class="embedded-meta">
-      {shortPubkey(event.pubkey)} · {formatDisplayDate(articlePublishedAt(event.rawEvent()))} · {articleReadTimeMinutes(event.content)} min
+      {formatDisplayDate(articlePublishedAt(event.rawEvent()))} · {articleReadTimeMinutes(event.content)} min read
     </span>
   </a>
 {:else}

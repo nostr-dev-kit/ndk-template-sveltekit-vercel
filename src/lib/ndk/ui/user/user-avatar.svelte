@@ -2,7 +2,7 @@
   import { getContext } from 'svelte';
   import { USER_CONTEXT_KEY, type UserContext } from './user.context.js';
   import { deterministicPubkeyGradient } from '@nostr-dev-kit/svelte';
-  import {cn} from "../../utils/cn.js";
+  import { cn } from '../../utils/cn.js';
   import type { Snippet } from 'svelte';
 
   interface Props {
@@ -34,6 +34,23 @@
       ? deterministicPubkeyGradient(context.ndkUser.pubkey)
       : 'var(--primary)'
   );
+  const avatarInitials = $derived.by(() => {
+    const rawName =
+      context.profile?.displayName ||
+      context.profile?.name ||
+      context.profile?.nip05?.split('@')[0] ||
+      'Author';
+
+    const parts = rawName
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2);
+
+    if (parts.length === 0) return 'A';
+
+    return parts.map((part) => part[0]?.toUpperCase() ?? '').join('').slice(0, 2) || 'A';
+  });
 
   let imageLoaded = $state(false);
   let imageError = $state(false);
@@ -61,11 +78,8 @@
     {#if customFallback}
       {@render customFallback()}
     {:else}
-      <div
-        class="registry-user-avatar-fallback"
-        style="background: {avatarGradient};"
-      >
-        {context.ndkUser?.pubkey?.slice(0, 2).toUpperCase() ?? '??'}
+      <div class="registry-user-avatar-fallback" style="background: {avatarGradient};">
+        {avatarInitials}
       </div>
     {/if}
   {/if}

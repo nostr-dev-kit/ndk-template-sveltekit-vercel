@@ -3,73 +3,64 @@
 </script>
 
 <section class="hero section reveal" use:reveal>
-  <span class="eyebrow eyebrow-green">About the template</span>
-  <h1>A SvelteKit starter for long-form Nostr apps that need the first request to work.</h1>
+  <span class="eyebrow eyebrow-green">About Relay Press</span>
+  <h1>A calmer way to read and share long-form writing from Nostr.</h1>
   <p class="lede">
-    Most Nostr demos stop at subscriptions. This template starts where article products usually get
-    hard: shareable routes, server-rendered previews, browser login, and a deployment path you can
-    put on Vercel without rebuilding the app boundary later.
+    Relay Press turns posts into clean, readable pages that are easy to share, revisit, and pass
+    around. Stories open as proper articles, writer pages gather someone's work in one place, and
+    links carry a useful preview when they travel.
   </p>
   <div class="actions">
-    <a class="button" href="/">Open the demo</a>
-    <a
-      class="button-secondary"
-      href="https://github.com/nostr-dev-kit/ndk/tree/master/svelte/templates/sveltekit-vercel-ndk"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      Use the template
-    </a>
+    <a class="button" href="/">Start reading</a>
   </div>
   <p class="caption">
-    Built for teams that want long-form article pages, author pages, and social previews to behave
-    like proper documents instead of placeholders waiting for hydration.
+    Built for readers first: clear typography, portable identity, and writing that feels at home on
+    the open web.
   </p>
 </section>
 
 <section class="section bento">
   <article class="panel span-8 reveal" use:reveal>
     <div class="panel-header">
-      <span class="eyebrow eyebrow-blue">Why it exists</span>
-      <h2>Long-form Nostr apps feel broken when everything waits for the browser.</h2>
+      <span class="eyebrow eyebrow-blue">Why people use it</span>
+      <h2>Writing deserves pages that feel finished.</h2>
       <p class="muted">
-        A client-only prototype can look fine in a local tab and fail the moment someone shares an
-        article link. Social unfurlers, crawlers, and first-time readers do not wait for session
-        state, IndexedDB, or client subscriptions.
+        A good reading app should disappear behind the work. Relay Press keeps the focus on the
+        story, the author, and the link you can send to someone else.
       </p>
     </div>
 
     <div class="definition-list">
       <div class="definition-row">
-        <span>Problem</span>
-        <p>Client-first Nostr demos usually ship blank previews and weak first loads for article pages.</p>
+        <span>Read</span>
+        <p>Open long-form posts in a layout made for reading, not debugging.</p>
       </div>
       <div class="definition-row">
-        <span>Approach</span>
-        <p>This template resolves article and profile data on the server before hydration starts.</p>
+        <span>Share</span>
+        <p>Pass links around with previews that tell people what they are about to open.</p>
       </div>
       <div class="definition-row">
-        <span>Result</span>
-        <p>Article routes, author routes, and social cards behave like actual documents.</p>
+        <span>Return</span>
+        <p>Come back to an author page and pick up where you left off.</p>
       </div>
     </div>
   </article>
 
   <article class="panel span-4 reveal" style="--index: 1;" use:reveal>
-    <span class="eyebrow eyebrow-yellow">Specific proof</span>
-    <h3>Concrete pieces, not broad promises.</h3>
+    <span class="eyebrow eyebrow-yellow">What changes</span>
+    <h3>The experience stays simple.</h3>
     <div class="definition-list">
       <div class="definition-row">
-        <span>3 surfaces</span>
-        <p>A server-seeded home page, author pages, and article pages.</p>
+        <span>Stories</span>
+        <p>Read essays and notes in a focused, shareable format.</p>
       </div>
       <div class="definition-row">
-        <span>2 logins</span>
-        <p>NIP-07 extension login and private-key login in the header.</p>
+        <span>Authors</span>
+        <p>Each writer has a home for their work instead of a loose list of posts.</p>
       </div>
       <div class="definition-row">
-        <span>1 deploy path</span>
-        <p>Vercel adapter included with no extra routing config.</p>
+        <span>Links</span>
+        <p>Shared pages keep their title, summary, and image wherever they land.</p>
       </div>
     </div>
   </article>
@@ -77,28 +68,28 @@
 
 <section class="section bento">
   <article class="panel span-4 reveal" use:reveal>
-    <span class="eyebrow eyebrow-green">What you get</span>
-    <h3>An article app shape that already understands Nostr.</h3>
+    <span class="eyebrow eyebrow-green">Reading first</span>
+    <h3>Clear hierarchy, generous spacing, and room for the writing to breathe.</h3>
     <p class="muted" style="margin: 0;">
-      The template splits browser and server work cleanly instead of hiding both behind one global
-      instance.
+      Relay Press avoids pushing readers into raw identifiers, implementation details, or cluttered
+      layouts.
     </p>
   </article>
 
   <article class="panel span-4 reveal" style="--index: 1;" use:reveal>
-    <span class="eyebrow eyebrow-blue">Preview safety</span>
-    <h3>Canonical, Open Graph, and Twitter metadata ship with the route.</h3>
+    <span class="eyebrow eyebrow-blue">Portable identity</span>
+    <h3>Bring the Nostr account you already use without giving up a familiar reading flow.</h3>
     <p class="muted" style="margin: 0;">
-      Shared article links render with a title, description, and fallback image before the client
-      connects.
+      Log in from a browser extension, a secret key, or another app when you want to personalize
+      the experience.
     </p>
   </article>
 
   <article class="panel span-4 reveal" style="--index: 2;" use:reveal>
-    <span class="eyebrow eyebrow-red">Browser sessions</span>
-    <h3>Login stays where it belongs: in the browser.</h3>
+    <span class="eyebrow eyebrow-red">Shareable pages</span>
+    <h3>Posts and profiles keep looking good when they travel outside the app.</h3>
     <p class="muted" style="margin: 0;">
-      `ndk.$sessions` handles persistence locally while server loads stay deterministic.
+      The first impression is a finished page, not a loading state waiting for context.
     </p>
   </article>
 </section>
@@ -106,8 +97,8 @@
 <section class="section bento">
   <article class="panel span-7 reveal" use:reveal>
     <div class="panel-header">
-      <span class="eyebrow eyebrow-blue">How it works</span>
-      <h2>The template separates the three jobs that usually get tangled together.</h2>
+      <span class="eyebrow eyebrow-blue">What you will find</span>
+      <h2>Relay Press is built around a few simple reading habits.</h2>
     </div>
 
     <div class="window">
@@ -117,27 +108,27 @@
           <span class="window-dot"></span>
           <span class="window-dot"></span>
         </span>
-        <span>Starter map</span>
-        <kbd>3 layers</kbd>
+        <span>Reading guide</span>
+        <kbd>3 patterns</kbd>
       </div>
 
       <div class="window-body">
         <div class="definition-list">
           <div class="definition-row">
-            <span>Client</span>
-            <p><span class="mono-inline">client.ts</span> initializes `NDKSvelte`, sessions, and live subscriptions.</p>
+            <span>Home</span>
+            <p>The front page surfaces recent long-form writing and makes it easy to keep browsing.</p>
           </div>
           <div class="definition-row">
-            <span>Server</span>
-            <p><span class="mono-inline">nostr.ts</span> uses plain `NDK` for `+page.server.ts` fetches.</p>
+            <span>Profiles</span>
+            <p>Author pages gather bios, links, and published stories in one place.</p>
           </div>
           <div class="definition-row">
-            <span>SEO</span>
-            <p><span class="mono-inline">seo.ts</span> turns route data into metadata for crawlers and previews.</p>
+            <span>Posts</span>
+            <p>Every article and note gets a dedicated page that is easy to revisit and share.</p>
           </div>
           <div class="definition-row">
-            <span>Registry</span>
-            <p><span class="mono-inline">jsrepo.config.ts</span> points at <kbd>@ndk/svelte</kbd>, and installed registry code lives under <span class="mono-inline">src/lib/ndk/*</span>.</p>
+            <span>Login</span>
+            <p>When you want to log in, you can use the account setup that already works for you.</p>
           </div>
         </div>
       </div>
@@ -146,19 +137,19 @@
 
   <article class="panel span-5 reveal" style="--index: 1;" use:reveal>
     <span class="eyebrow eyebrow-yellow">Who it is for</span>
-    <h3>Use this when article routes need to feel finished from day one.</h3>
+    <h3>Use Relay Press when writing should feel linkable, legible, and easy to follow.</h3>
     <div class="definition-list">
       <div class="definition-row">
-        <span>Publishers</span>
-        <p>Who want a Nostr-native reading product instead of a note demo.</p>
+        <span>Readers</span>
+        <p>Who want a cleaner way to explore essays, dispatches, and notes.</p>
       </div>
       <div class="definition-row">
-        <span>Teams</span>
-        <p>Who need author pages and article routes that hold up in previews.</p>
+        <span>Writers</span>
+        <p>Who want their work to look good the moment someone opens the link.</p>
       </div>
       <div class="definition-row">
-        <span>Maintainers</span>
-        <p>Who need a clear starting point for Vercel deployment.</p>
+        <span>Communities</span>
+        <p>Who want a public reading surface that feels like a product instead of a test bench.</p>
       </div>
     </div>
   </article>
@@ -166,22 +157,13 @@
 
 <section class="section reveal" style="--index: 2;" use:reveal>
   <article class="panel soft stack">
-    <span class="eyebrow eyebrow-green">Use it</span>
-    <h2>Start from a template that already handles the uncomfortable parts of long-form Nostr.</h2>
+    <span class="eyebrow eyebrow-green">Open the app</span>
+    <h2>Start reading, open a profile, or share a story.</h2>
     <p class="lede" style="margin: 0;">
-      If you know your app needs shareable article routes, login, and deployment discipline, begin
-      here instead of rebuilding the boundary between client and server after the product is live.
+      Relay Press keeps the experience focused on people and writing, not protocol trivia.
     </p>
     <div class="actions">
-      <a class="button" href="/">Review the demo</a>
-      <a
-        class="button-secondary"
-        href="https://github.com/nostr-dev-kit/ndk/tree/master/svelte/templates/sveltekit-vercel-ndk"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        Open the template folder
-      </a>
+      <a class="button" href="/">Browse stories</a>
     </div>
   </article>
 </section>

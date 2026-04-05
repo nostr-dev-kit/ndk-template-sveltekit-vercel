@@ -56,11 +56,11 @@
 {#if user && href}
   <a data-mention="" class={`mention ${className}`} href={href} onclick={handleClick}>
     <User.Root {ndk} {user}>
-      @<User.Name class="mention-name" field="name" />
+      @<User.Name class="mention-name" field="name" fallback="someone" />
     </User.Root>
   </a>
 {:else}
-  <span data-mention="" class={`mention ${className}`}>nostr:{bech32}</span>
+  <span data-mention="" class={`mention ${className}`}>@someone</span>
 {/if}
 
 <style>

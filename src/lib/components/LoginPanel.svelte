@@ -6,6 +6,7 @@
   import QRCode from 'qrcode';
   import * as Dialog from '$lib/components/ui/dialog';
   import { APP_NAME } from '$lib/ndk/config';
+  import { cleanText, displayName } from '$lib/ndk/format';
   import { ndk } from '$lib/ndk/client';
 
   let open = $state(false);
@@ -22,6 +23,15 @@
   const currentUser = $derived(ndk.$currentUser);
   const hasExtension = $derived(browser && typeof window !== 'undefined' && 'nostr' in window);
   const remoteSignerReady = $derived(Boolean(qrCodeDataUrl && nostrConnectUri));
+  const currentUserLabel = $derived.by(() => {
+    if (!currentUser) return '';
+
+    return (
+      displayName(currentUser.profile ?? undefined, '') ||
+      cleanText(currentUser.profile?.nip05) ||
+      'Signed in'
+    );
+  });
 
   function resetRemoteSigner() {
     bunkerUri = '';
@@ -52,7 +62,7 @@
   });
 
   async function loginWithExtension() {
-    if (!ndk.$sessions || pending) return;
+    if (!ndk.$sessions || pending || !hasExtension) return;
 
     try {
       pending = true;
@@ -60,7 +70,7 @@
       await ndk.$sessions.login(new NDKNip07Signer());
       open = false;
     } catch (caught) {
-      error = caught instanceof Error ? caught.message : 'Extension login failed.';
+      error = caught instanceof Error ? caught.message : "Couldn't log in with the extension.";
     } finally {
       pending = false;
     }
@@ -75,7 +85,7 @@
       await ndk.$sessions.login(new NDKPrivateKeySigner(privateKey.trim()));
       open = false;
     } catch (caught) {
-      error = caught instanceof Error ? caught.message : 'Private-key login failed.';
+      error = caught instanceof Error ? caught.message : "Couldn't log in with that key.";
     } finally {
       pending = false;
     }
@@ -98,7 +108,7 @@
       nostrConnectUri = signer.nostrConnectUri || '';
 
       if (!nostrConnectUri) {
-        throw new Error('Failed to generate nostrconnect URI.');
+        throw new Error("Couldn't create a connection QR code.");
       }
 
       qrCodeDataUrl = await QRCode.toDataURL(nostrConnectUri, {
@@ -120,10 +130,10 @@
         })
         .catch((caught) => {
           if (nostrConnectSigner !== signer) return;
-          error = caught instanceof Error ? caught.message : 'Failed to connect via nostrconnect://';
+          error = caught instanceof Error ? caught.message : "Couldn't finish connecting to that app.";
         });
     } catch (caught) {
-      error = caught instanceof Error ? caught.message : 'Failed to initialize remote signer.';
+      error = caught instanceof Error ? caught.message : "Couldn't start pairing with another app.";
       resetRemoteSigner();
     } finally {
       preparingRemoteSigner = false;
@@ -146,7 +156,7 @@
       await ndk.$sessions.login(signer);
       open = false;
     } catch (caught) {
-      error = caught instanceof Error ? caught.message : 'Failed to connect to bunker.';
+      error = caught instanceof Error ? caught.message : "Couldn't use that connection link.";
     } finally {
       connectingBunker = false;
     }
@@ -164,9 +174,9 @@
 
 {#if currentUser}
   <div class="login-shell">
-    <div class="status-pill status-green">Active session</div>
+    <div class="status-pill status-green">Signed in</div>
     <div class="actions">
-      <span class="mono-inline">{currentUser.npub.slice(0, 18)}...</span>
+      <span class="muted">{currentUserLabel}</span>
       <a class="button-secondary" href={`/profile/${currentUser.npub}`}>Profile</a>
       <button class="button-secondary" type="button" onclick={logout}>Log out</button>
     </div>
@@ -174,16 +184,16 @@
 {:else}
   <div class="login-shell">
     <Dialog.Root bind:open>
-      <Dialog.Trigger class="button-secondary login-trigger">Connect signer</Dialog.Trigger>
+      <Dialog.Trigger class="button-secondary login-trigger">Log in</Dialog.Trigger>
 
       <Dialog.Content class="login-dialog">
         <div class="login-dialog-chrome">
           <div class="login-dialog-handle" aria-hidden="true"></div>
 
           <Dialog.Header class="login-dialog-header">
-            <Dialog.Title>Connect a signer</Dialog.Title>
+            <Dialog.Title>Log in</Dialog.Title>
             <Dialog.Description>
-              Use an extension, a private key, or a remote signer over NIP-46. The session stays in browser storage.
+              Choose how you want to log in. Your session stays on this device.
             </Dialog.Description>
           </Dialog.Header>
 
@@ -210,7 +220,7 @@
               type="button"
               onclick={() => (mode = 'private-key')}
             >
-              Private key
+              Secret key
             </button>
             <button
               class:active={mode === 'remote'}
@@ -218,27 +228,27 @@
               type="button"
               onclick={() => (mode = 'remote')}
             >
-              Remote
+              Another app
             </button>
           </div>
 
           {#if mode === 'extension'}
             <div class="stack">
               <p class="muted" style="margin: 0;">
-                Use a browser signer that supports <kbd>NIP-07</kbd>.
+                Use a browser extension you already trust.
               </p>
               <div class={`status-pill ${hasExtension ? 'status-green' : 'status-yellow'}`}>
-                {hasExtension ? 'Extension detected' : 'No extension detected'}
+                {hasExtension ? 'Extension ready' : 'Extension not found'}
               </div>
-              <button class="button login-action" type="button" onclick={loginWithExtension} disabled={pending}>
-                {pending ? 'Connecting...' : 'Connect extension'}
+              <button class="button login-action" type="button" onclick={loginWithExtension} disabled={pending || !hasExtension}>
+                {pending ? 'Connecting...' : 'Continue with extension'}
               </button>
             </div>
           {:else if mode === 'private-key'}
             <div class="stack">
               <label class="field">
-                <span class="muted">nsec or hex private key</span>
-                <textarea bind:value={privateKey} placeholder="nsec1... or 64-char hex"></textarea>
+                <span class="muted">Secret key</span>
+                <textarea bind:value={privateKey} placeholder="Paste your secret key"></textarea>
               </label>
               <button
                 class="button login-action"
@@ -246,14 +256,14 @@
                 onclick={loginWithPrivateKey}
                 disabled={pending || !privateKey.trim()}
               >
-                {pending ? 'Signing in...' : 'Login with private key'}
+                {pending ? 'Signing in...' : 'Continue with key'}
               </button>
             </div>
           {:else}
             <div class="stack">
               <p class="muted" style="margin: 0;">
-                Connect a remote signer with <kbd>NIP-46</kbd>. Generate a clickable
-                <kbd>nostrconnect://</kbd> QR, or paste a <kbd>bunker://</kbd> secret.
+                Pair with another app. Show a QR code to approve this session, or paste a connection
+                link.
               </p>
 
               {#if remoteSignerReady}
@@ -261,14 +271,13 @@
                   <a
                     class="nip46-qr-button"
                     href={nostrConnectUri}
-                    title="Open in signer app"
+                    title="Open in app"
                   >
-                    <img class="nip46-qr-image" src={qrCodeDataUrl} alt="Nostrconnect QR code" />
+                    <img class="nip46-qr-image" src={qrCodeDataUrl} alt="Connection QR code" />
                   </a>
-                  <div class="status-pill status-blue nip46-status">Waiting for signer approval</div>
+                  <div class="status-pill status-blue nip46-status">Waiting for approval</div>
                   <p class="caption nip46-caption">
-                    Click the QR to open <kbd>nostrconnect://</kbd> in a local signer app, or scan
-                    it from another device.
+                    Open the QR in another app on this device, or scan it from another one.
                   </p>
                 </div>
               {:else}
@@ -279,21 +288,21 @@
                     onclick={startRemoteSigner}
                     disabled={preparingRemoteSigner || connectingBunker}
                   >
-                    {preparingRemoteSigner ? 'Generating QR...' : 'Generate nostrconnect QR'}
+                    {preparingRemoteSigner ? 'Preparing QR...' : 'Show QR code'}
                   </button>
                   <p class="caption nip46-caption">
-                    This creates a local secret and waits for a signer app to approve the session.
+                    This starts a one-time pairing request and waits for approval.
                   </p>
                 </div>
               {/if}
 
               <div class="login-divider">
-                <span>Or paste bunker URI</span>
+                <span>Or paste a link</span>
               </div>
 
               <label class="field">
-                <span class="muted">bunker:// secret</span>
-                <input bind:value={bunkerUri} placeholder="bunker://..." />
+                <span class="muted">Connection link</span>
+                <input bind:value={bunkerUri} placeholder="Paste a connection link" />
               </label>
               <button
                 class="button login-action"
@@ -301,7 +310,7 @@
                 onclick={loginWithBunker}
                 disabled={connectingBunker || !bunkerUri.trim().startsWith('bunker://')}
               >
-                {connectingBunker ? 'Connecting...' : 'Connect bunker'}
+                {connectingBunker ? 'Connecting...' : 'Continue with link'}
               </button>
             </div>
           {/if}
