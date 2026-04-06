@@ -279,29 +279,31 @@
     display: grid;
     align-content: end;
     gap: 1rem;
+    width: 100%;
   }
 
   .lead-story-body {
-    max-width: min(54rem, 82%);
+    width: 100%;
+    max-width: none;
     gap: 0.8rem;
   }
 
   .lead-story-title {
-    max-width: 16ch;
+    max-width: none;
     font-size: clamp(2.35rem, 4vw, 4.15rem);
     line-height: 0.94;
     letter-spacing: -0.055em;
   }
 
   .lead-story-title[data-size='balanced'] {
-    max-width: 18ch;
+    max-width: none;
     font-size: clamp(2.1rem, 3.45vw, 3.45rem);
     line-height: 0.96;
     letter-spacing: -0.045em;
   }
 
   .lead-story-title[data-size='compact'] {
-    max-width: 20ch;
+    max-width: none;
     font-size: clamp(1.8rem, 2.95vw, 2.85rem);
     line-height: 0.98;
     letter-spacing: -0.035em;
@@ -312,7 +314,12 @@
   }
 
   .lead-story-byline {
+    width: 100%;
     align-items: flex-start;
+  }
+
+  .lead-deck {
+    max-width: none;
   }
 
   .lead-story-byline :global(.story-author-name) {
@@ -334,7 +341,7 @@
     }
 
     .lead-story-body {
-      max-width: 100%;
+      max-width: none;
     }
 
     .lead-story-title,
