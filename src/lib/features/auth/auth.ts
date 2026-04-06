@@ -10,7 +10,7 @@ import { APP_NAME } from '$lib/ndk/config';
 import { avatarUrl, cleanText, displayName, displayNip05, profileIdentifier } from '$lib/ndk/format';
 import { interestTagsFromEvent, onboardingComplete } from '$lib/onboarding';
 
-const NOSTR_CONNECT_RELAY = 'wss://relay.nsec.app';
+const NOSTR_CONNECT_RELAY = 'wss://relay.primal.net';
 
 export type LoginIntent = 'login' | 'join';
 export type LoginMode = 'extension' | 'private-key' | 'remote';
