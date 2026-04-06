@@ -223,7 +223,7 @@ kbd,
 .page h3 {
   margin: 0;
   color: var(--text-strong);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.03;
@@ -320,7 +320,7 @@ kbd,
 
 .brief-link {
   color: var(--text-strong);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -606,7 +606,7 @@ kbd,
 .story-card-title {
   margin: 0;
   color: var(--text-strong);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-weight: 600;
   letter-spacing: -0.025em;
   line-height: 1.05;
@@ -796,7 +796,7 @@ kbd,
 .feed-title {
   margin: 0;
   color: var(--text-strong);
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 1.45rem;
   font-weight: 600;
   letter-spacing: -0.02em;

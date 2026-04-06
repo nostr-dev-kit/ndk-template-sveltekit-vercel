@@ -74,7 +74,6 @@
 {#if data.missing}
   <section class="section reveal" use:reveal>
     <article class="panel stack">
-      <span class="eyebrow eyebrow-red">Missing profile</span>
       <h1>We could not find that profile</h1>
       <p class="muted" style="margin: 0;">Try a different profile link or come back in a moment.</p>
     </article>
@@ -96,7 +95,6 @@
           </User.Root>
 
           <div class="author-id-copy">
-            <span class="eyebrow eyebrow-blue">Essays</span>
             <h1>{name}</h1>
             <p class="author-bio">{bio}</p>
 
@@ -154,7 +152,6 @@
   <section class="section bento author-publication">
     <div class="span-8 stack" id="stories">
       <div class="section-intro reveal" use:reveal>
-        <span class="eyebrow eyebrow-green">Stories</span>
         <h2>Latest writing</h2>
         <p class="caption" style="margin: 0;">Newest first.</p>
       </div>
@@ -162,22 +159,13 @@
       {#if featuredArticle}
         <a class="panel story-link-card author-lead-story reveal" href={`/note/${featuredArticle.encode()}`} use:reveal>
           <div class="author-lead-copy">
-            <div class="story-kicker-row">
-              <span class="eyebrow eyebrow-blue">Latest</span>
-              <div class="story-pub-meta">
-                <span>{formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent()))}</span>
-                <span>{articleReadTimeMinutes(featuredArticle.content)} min read</span>
-              </div>
+            <div class="story-pub-meta">
+              <span>{formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent()))}</span>
+              <span>{articleReadTimeMinutes(featuredArticle.content)} min read</span>
             </div>
 
             <h2>{articleTitle(featuredArticle.rawEvent())}</h2>
             <p class="lead-deck">{articleSummary(featuredArticle.rawEvent(), 360)}</p>
-
-            <div class="topic-row">
-              {#each articleTopics(featuredArticle.rawEvent(), 4) as topic}
-                <span class="status-pill status-blue">{topic}</span>
-              {/each}
-            </div>
           </div>
 
           {#if featuredImageUrl}
@@ -206,11 +194,6 @@
                 </div>
                 <h3>{articleTitle(event.rawEvent())}</h3>
                 <p>{articleSummary(event.rawEvent(), 220)}</p>
-                <div class="topic-row">
-                  {#each articleTopics(event.rawEvent(), 3) as topic}
-                    <span class="status-pill status-yellow">{topic}</span>
-                  {/each}
-                </div>
               </div>
 
               {#if imageUrlFor(event)}
@@ -229,7 +212,6 @@
     <aside class="span-4 author-sidebar reveal" style="--index: 2;" use:reveal id="about">
       <article class="panel author-sidebar-card">
         <div class="section-intro">
-          <span class="eyebrow eyebrow-yellow">About</span>
           <h3>{name}</h3>
         </div>
 
@@ -253,21 +235,14 @@
       {#if focusTopics.length > 0}
         <article class="panel author-sidebar-card">
           <div class="section-intro">
-            <span class="eyebrow eyebrow-green">Topics</span>
             <h3>Often writing about</h3>
           </div>
-
-          <div class="topic-row">
-            {#each focusTopics as topic}
-              <span class="status-pill status-green">{topic}</span>
-            {/each}
-          </div>
+          <p class="muted" style="margin: 0;">{focusTopics.join(' · ')}</p>
         </article>
       {/if}
 
       <article class="panel author-sidebar-card">
         <div class="section-intro">
-          <span class="eyebrow eyebrow-red">Overview</span>
           <h3>Catalog</h3>
         </div>
 
@@ -294,7 +269,6 @@
       {#if featuredArticle}
         <article class="panel author-sidebar-card">
           <div class="section-intro">
-            <span class="eyebrow eyebrow-blue">Latest</span>
             <h3>Start here</h3>
           </div>
 

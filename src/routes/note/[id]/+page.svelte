@@ -9,7 +9,6 @@
     articleReadTimeMinutes,
     articleSummary,
     articleTitle,
-    articleTopics,
     displayNip05,
     displayName,
     formatDisplayDate,
@@ -32,7 +31,6 @@
 {#if data.missing}
   <section class="section reveal" use:reveal>
     <article class="panel stack">
-      <span class="eyebrow eyebrow-red">Missing note</span>
       <h1>This post is not available right now</h1>
       <p class="muted" style="margin: 0;">It may have moved, been deleted, or not synced yet.</p>
     </article>
@@ -40,7 +38,6 @@
 {:else if event}
   <section class="section bento">
     <article class="panel span-12 reveal" use:reveal>
-      <span class="eyebrow eyebrow-blue">{isArticle ? 'Article' : 'Note'}</span>
       <h1>{isArticle ? articleTitle(event.rawEvent()) : noteTitle(event.rawEvent())}</h1>
 
       <div class="article-byline">
@@ -74,14 +71,6 @@
       <p class="lede" style="margin: 0;">
         {isArticle ? articleSummary(event.rawEvent(), 320) : noteExcerpt(event.content, 320)}
       </p>
-
-      {#if isArticle}
-        <div class="topic-row">
-          {#each articleTopics(event.rawEvent()) as topic}
-            <span class="status-pill status-yellow">{topic}</span>
-          {/each}
-        </div>
-      {/if}
 
       {#if isArticle}
         <ArticleMarkdown content={event.content} tags={event.tags} />

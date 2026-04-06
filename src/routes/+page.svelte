@@ -10,7 +10,6 @@
     articleReadTimeMinutes,
     articleSummary,
     articleTitle,
-    articleTopics,
     formatDisplayDate
   } from '$lib/ndk/format';
 
@@ -64,15 +63,6 @@
 <section class="lead-grid section">
   {#if featuredArticle}
     <a class="panel story-link-card lead-story reveal" href={`/note/${featuredArticle.encode()}`} use:reveal>
-      <div class="story-kicker-row">
-        <span class="eyebrow eyebrow-blue">Featured</span>
-        <div class="topic-row">
-          {#each articleTopics(featuredArticle.rawEvent(), 3) as topic}
-            <span class="status-pill status-blue">{topic}</span>
-          {/each}
-        </div>
-      </div>
-
       <h1>{articleTitle(featuredArticle.rawEvent())}</h1>
       <p class="lead-deck">{articleSummary(featuredArticle.rawEvent(), 360)}</p>
 
@@ -87,7 +77,6 @@
     </a>
   {:else}
     <article class="panel lead-story reveal" use:reveal>
-      <span class="eyebrow eyebrow-blue">Featured</span>
       <h1>Waiting for the first story.</h1>
       <p class="lead-deck">New writing will appear here as soon as stories are available.</p>
     </article>
@@ -95,7 +84,6 @@
 
   <aside class="panel story-rail reveal" style="--index: 1;" use:reveal>
     <div class="section-intro">
-      <span class="eyebrow eyebrow-green">In discussion</span>
       <h2>Active essays</h2>
     </div>
 
@@ -128,7 +116,6 @@
 
 <section class="section" id="reading-stack">
   <div class="section-intro reveal" use:reveal>
-    <span class="eyebrow eyebrow-yellow">Conversation</span>
     <h2>More to read</h2>
   </div>
 
@@ -147,11 +134,6 @@
           </div>
           <h3 class="story-card-title">{articleTitle(event.rawEvent())}</h3>
           <p class="story-card-summary">{articleSummary(event.rawEvent(), 180)}</p>
-          <div class="topic-row">
-            {#each articleTopics(event.rawEvent(), 3) as topic}
-              <span class="status-pill status-yellow">{topic}</span>
-            {/each}
-          </div>
           <div class="story-byline compact">
             <StoryAuthor
               {ndk}
@@ -174,7 +156,6 @@
 {#if archiveArticles.length > 0}
   <section class="section reveal" style="--index: 2;" use:reveal>
     <div class="section-intro">
-      <span class="eyebrow eyebrow-red">Archive</span>
       <h2>Additional reading</h2>
     </div>
 

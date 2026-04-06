@@ -3,7 +3,6 @@
 </script>
 
 <section class="hero section reveal" use:reveal>
-  <span class="eyebrow eyebrow-green">About Relay Press</span>
   <h1>A calmer way to read and share long-form writing from Nostr.</h1>
   <p class="lede">
     Relay Press turns posts into clean, readable pages that are easy to share, revisit, and pass
@@ -22,7 +21,6 @@
 <section class="section bento">
   <article class="panel span-8 reveal" use:reveal>
     <div class="panel-header">
-      <span class="eyebrow eyebrow-blue">Why people use it</span>
       <h2>Writing deserves pages that feel finished.</h2>
       <p class="muted">
         A good reading app should disappear behind the work. Relay Press keeps the focus on the
@@ -47,7 +45,6 @@
   </article>
 
   <article class="panel span-4 reveal" style="--index: 1;" use:reveal>
-    <span class="eyebrow eyebrow-yellow">What changes</span>
     <h3>The experience stays simple.</h3>
     <div class="definition-list">
       <div class="definition-row">
@@ -68,7 +65,6 @@
 
 <section class="section bento">
   <article class="panel span-4 reveal" use:reveal>
-    <span class="eyebrow eyebrow-green">Reading first</span>
     <h3>Clear hierarchy, generous spacing, and room for the writing to breathe.</h3>
     <p class="muted" style="margin: 0;">
       Relay Press avoids pushing readers into raw identifiers, implementation details, or cluttered
@@ -77,7 +73,6 @@
   </article>
 
   <article class="panel span-4 reveal" style="--index: 1;" use:reveal>
-    <span class="eyebrow eyebrow-blue">Portable identity</span>
     <h3>Bring the Nostr account you already use without giving up a familiar reading flow.</h3>
     <p class="muted" style="margin: 0;">
       Log in from a browser extension, a secret key, or another app when you want to personalize
@@ -86,7 +81,6 @@
   </article>
 
   <article class="panel span-4 reveal" style="--index: 2;" use:reveal>
-    <span class="eyebrow eyebrow-red">Shareable pages</span>
     <h3>Posts and profiles keep looking good when they travel outside the app.</h3>
     <p class="muted" style="margin: 0;">
       The first impression is a finished page, not a loading state waiting for context.
@@ -97,7 +91,6 @@
 <section class="section bento">
   <article class="panel span-7 reveal" use:reveal>
     <div class="panel-header">
-      <span class="eyebrow eyebrow-blue">What you will find</span>
       <h2>Relay Press is built around a few simple reading habits.</h2>
     </div>
 
@@ -136,7 +129,6 @@
   </article>
 
   <article class="panel span-5 reveal" style="--index: 1;" use:reveal>
-    <span class="eyebrow eyebrow-yellow">Who it is for</span>
     <h3>Use Relay Press when writing should feel linkable, legible, and easy to follow.</h3>
     <div class="definition-list">
       <div class="definition-row">
@@ -157,7 +149,6 @@
 
 <section class="section reveal" style="--index: 2;" use:reveal>
   <article class="panel soft stack">
-    <span class="eyebrow eyebrow-green">Open the app</span>
     <h2>Start reading, open a profile, or share a story.</h2>
     <p class="lede" style="margin: 0;">
       Relay Press keeps the experience focused on people and writing, not protocol trivia.
