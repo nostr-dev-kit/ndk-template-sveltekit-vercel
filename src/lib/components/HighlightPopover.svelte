@@ -34,10 +34,11 @@
   function showPopoverForSelection() {
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !selection.toString().trim()) return;
-    if (!containerEl) return;
 
     const range = selection.getRangeAt(0);
-    if (!containerEl.contains(range.commonAncestorContainer)) return;
+
+    // Check if selection is within the article content container
+    if (containerEl && !containerEl.contains(range.commonAncestorContainer)) return;
 
     selectedText = selection.toString().trim();
     contextText = getContext(selection);
@@ -49,13 +50,11 @@
   }
 
   function handleMouseUp() {
-    // Small delay so the selection is finalized
     setTimeout(showPopoverForSelection, 10);
   }
 
-  function handleDocumentMouseDown(e: MouseEvent) {
+  function handleMouseDown(e: MouseEvent) {
     if (!visible) return;
-    // If clicking inside the popover, don't dismiss
     const popoverEl = document.querySelector('.highlight-popover');
     if (popoverEl?.contains(e.target as Node)) return;
     visible = false;
@@ -64,13 +63,11 @@
   }
 
   $effect(() => {
-    if (!containerEl) return;
-
-    containerEl.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('mousedown', handleDocumentMouseDown);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousedown', handleMouseDown);
     return () => {
-      containerEl!.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('mousedown', handleDocumentMouseDown);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousedown', handleMouseDown);
     };
   });
 
