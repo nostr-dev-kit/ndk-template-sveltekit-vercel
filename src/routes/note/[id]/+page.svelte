@@ -349,7 +349,6 @@
             <div bind:this={articleContentEl}>
               <ArticleMarkdown content={event.content} tags={event.tags} highlights={highlightEvents} />
             </div>
-            <HighlightPopover articleEvent={event} containerEl={articleContentEl} />
           </Tabs.Content>
 
           <Tabs.Content value="comments" class="article-tab-panel">
@@ -487,6 +486,10 @@
         <pre class="document-copy">{event.content}</pre>
       {/if}
     </article>
+
+    {#if isArticle}
+      <HighlightPopover articleEvent={event} containerEl={articleContentEl} />
+    {/if}
   </section>
 {/if}
 
