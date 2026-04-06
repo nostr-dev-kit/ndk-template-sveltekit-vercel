@@ -1,18 +1,26 @@
 <script lang="ts">
+  import type { PageProps } from './$types';
   import { goto } from '$app/navigation';
   import {
     NDKBlossomList,
+    NDKEvent,
     NDKInterestList,
     NDKKind,
-    NDKNip07Signer,
-    NDKNip46Signer,
     NDKPrivateKeySigner,
-    type NDKEvent,
-    type NDKUserProfile
+    type NDKUser,
+    type NDKUserProfile,
+    type NostrEvent
   } from '@nostr-dev-kit/ndk';
   import { onDestroy } from 'svelte';
-  import { cleanText, displayName, profileIdentifier } from '$lib/ndk/format';
   import { ndk, ensureClientNdk } from '$lib/ndk/client';
+  import { cleanText, displayName, profileIdentifier } from '$lib/ndk/format';
+  import {
+    NIP05_REGISTRATION_AUTH_KIND,
+    formatManagedNip05Identifier,
+    isValidManagedNip05Name,
+    managedNip05NameFromIdentifier,
+    normalizeManagedNip05Name
+  } from '$lib/ndk/nip05';
   import {
     DEFAULT_BLOSSOM_SERVER,
     INTEREST_SUGGESTIONS,
@@ -21,13 +29,46 @@
     mergeBlossomServers,
     normalizeInterestTag,
     normalizeInterestTags,
-    onboardingComplete,
     parseBlossomServer
   } from '$lib/onboarding';
-  import { hasNostrExtension, prepareRemoteSignerPairing, stopNostrConnectSigner } from '$lib/features/auth/auth';
+
+  type Nip05Status = 'idle' | 'checking' | 'available' | 'owned' | 'taken' | 'error';
+
+  let { data }: PageProps = $props();
 
   // ── wizard step ────────────────────────────────────────────────
-  let step = $state<1 | 2 | 3>(1);
+  let step = $state<1 | 2>(1);
+
+  // ── fake name placeholders ──────────────────────────────────────
+  const FAKE_NAMES = [
+    'Milo Vance', 'Sable Quinn', 'Cleo Hartwell', 'Ren Ashford',
+    'Piper Strand', 'Callum Wray', 'Indigo Marsh', 'Nox Ellery',
+    'Wren Coulter', 'Soren Dahl', 'Lyra Finch', 'Caius Webb',
+    'Blythe Rowe', 'Emery Holt', 'Zara Flint', 'Thane Osler'
+  ];
+  const namePlaceholder = FAKE_NAMES[Math.floor(Math.random() * FAKE_NAMES.length)];
+
+  // ── dicebear avatar presets ─────────────────────────────────────
+  const DICEBEAR_AVATARS = [
+    { style: 'adventurer', seed: 'Felix' },
+    { style: 'adventurer', seed: 'Mia' },
+    { style: 'adventurer', seed: 'Zara' },
+    { style: 'adventurer', seed: 'Cleo' },
+    { style: 'lorelei', seed: 'Sable' },
+    { style: 'lorelei', seed: 'Ren' },
+    { style: 'lorelei', seed: 'Nox' },
+    { style: 'lorelei', seed: 'Lyra' },
+    { style: 'micah', seed: 'Wren' },
+    { style: 'micah', seed: 'Thane' },
+    { style: 'micah', seed: 'Emery' },
+    { style: 'micah', seed: 'Caius' }
+  ].map(({ style, seed }) => ({
+    url: `https://api.dicebear.com/9.x/${style}/svg?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`,
+    seed,
+    style
+  }));
+
+  let selectedDicebear = $state<string | null>(null);
 
   // ── profile fields ─────────────────────────────────────────────
   let activePubkey = $state<string | null>(null);
@@ -36,6 +77,7 @@
   let display = $state('');
   let about = $state('');
   let website = $state('');
+  let managedNip05Name = $state('');
   let blossomServer = $state(DEFAULT_BLOSSOM_SERVER);
   let selectedInterests: string[] = $state([]);
   let customInterest = $state('');
@@ -43,6 +85,7 @@
   let avatarFile: File | null = $state(null);
   let avatarPreviewUrl = $state('');
   let profileTouched = $state(false);
+  let managedNip05Touched = $state(false);
   let interestsTouched = $state(false);
   let blossomTouched = $state(false);
   let profileLoading = $state(false);
@@ -51,30 +94,43 @@
   let uploadProgress = $state<number | null>(null);
   let saveError = $state('');
   let uploadError = $state('');
+  let managedNip05Status = $state<Nip05Status>('idle');
+  let managedNip05StatusPubkey = $state<string | null>(null);
   let fileInput: HTMLInputElement | null = $state(null);
-
-  // ── auth (step 3) ───────────────────────────────────────────────
-  let authMode = $state<'extension' | 'private-key' | 'remote'>('extension');
-  let privateKey = $state('');
-  let bunkerUri = $state('');
-  let qrCodeDataUrl = $state('');
-  let nostrConnectUri = $state('');
-  let nostrConnectSigner: NDKNip46Signer | null = $state(null);
-  let authPending = $state(false);
-  let preparingRemoteSigner = $state(false);
-  let connectingBunker = $state(false);
-  let authError = $state('');
 
   // ── derived ─────────────────────────────────────────────────────
   const currentUser = $derived(ndk.$currentUser);
-  const currentSession = $derived(ndk.$sessions?.current);
   const interestEvent = $derived(ndk.$sessions?.getSessionEvent(NDKKind.InterestList));
   const blossomEvent = $derived(ndk.$sessions?.getSessionEvent(NDKKind.BlossomList));
   const isReadOnly = $derived(Boolean(ndk.$sessions?.isReadOnly()));
-  const avatarDisplayUrl = $derived(avatarPreviewUrl || avatarUrl);
+  const avatarDisplayUrl = $derived(avatarPreviewUrl || avatarUrl || selectedDicebear || '');
   const normalizedInterests = $derived(normalizeInterestTags(selectedInterests));
-  const extensionAvailable = $derived(hasNostrExtension());
-  const canPublish = $derived(Boolean(currentUser) && !isReadOnly && !saving && !uploadingAvatar);
+  const managedNip05Domain = $derived(data.nip05Domain ?? null);
+  const managedNip05Enabled = $derived(Boolean(managedNip05Domain));
+  const normalizedManagedNip05Name = $derived(normalizeManagedNip05Name(managedNip05Name));
+  const managedNip05Valid = $derived(
+    !normalizedManagedNip05Name || isValidManagedNip05Name(normalizedManagedNip05Name)
+  );
+  const currentManagedNip05Name = $derived(
+    managedNip05NameFromIdentifier(
+      cleanText(currentUser?.profile?.nip05) || cleanText(resolvedProfile?.nip05),
+      managedNip05Domain
+    )
+  );
+  const existingExternalNip05 = $derived.by(() => {
+    const rawNip05 = cleanText(currentUser?.profile?.nip05) || cleanText(resolvedProfile?.nip05);
+    if (!rawNip05 || currentManagedNip05Name) return '';
+    return rawNip05;
+  });
+  const managedNip05Identifier = $derived.by(() => {
+    if (!managedNip05Domain || !normalizedManagedNip05Name) return '';
+    return formatManagedNip05Identifier(normalizedManagedNip05Name, managedNip05Domain);
+  });
+  const managedNip05Ready = $derived.by(() => {
+    if (!managedNip05Enabled || !normalizedManagedNip05Name) return true;
+    if (!managedNip05Valid) return false;
+    return managedNip05Status === 'available' || managedNip05Status === 'owned';
+  });
   const writerLabel = $derived(
     displayName(
       {
@@ -85,14 +141,16 @@
       'You'
     )
   );
-  const step1Valid = $derived(Boolean(cleanText(name) || cleanText(display)));
+  const step1Valid = $derived(
+    Boolean(cleanText(name) || cleanText(display)) && managedNip05Ready
+  );
   const step2Valid = $derived(normalizedInterests.length > 0);
+  const canPublish = $derived(!isReadOnly && !saving && !uploadingAvatar && step2Valid && managedNip05Ready);
 
   // ── profile helpers ─────────────────────────────────────────────
   function clearMessages() {
     saveError = '';
     uploadError = '';
-    authError = '';
   }
 
   function clearAvatarPreview() {
@@ -108,23 +166,33 @@
     display = '';
     about = '';
     website = '';
+    managedNip05Name = '';
+    managedNip05Touched = false;
+    managedNip05Status = 'idle';
+    managedNip05StatusPubkey = null;
     blossomServer = DEFAULT_BLOSSOM_SERVER;
     selectedInterests = [];
     customInterest = '';
     avatarUrl = '';
     avatarFile = null;
+    selectedDicebear = null;
     clearAvatarPreview();
     if (fileInput) fileInput.value = '';
   }
 
   function seedProfile(profile: NDKUserProfile | undefined) {
     resolvedProfile = profile ? { ...profile } : undefined;
-    if (profileTouched) return;
-    name = cleanText(profile?.name);
-    display = cleanText(profile?.displayName);
-    about = cleanText(profile?.about || profile?.bio);
-    website = cleanText(profile?.website);
-    avatarUrl = cleanText(profile?.picture || profile?.image);
+    if (!profileTouched) {
+      name = cleanText(profile?.name);
+      display = cleanText(profile?.displayName);
+      about = cleanText(profile?.about || profile?.bio);
+      website = cleanText(profile?.website);
+      avatarUrl = cleanText(profile?.picture || profile?.image);
+    }
+
+    if (!managedNip05Touched && managedNip05Domain) {
+      managedNip05Name = managedNip05NameFromIdentifier(profile?.nip05, managedNip05Domain) ?? '';
+    }
   }
 
   function toggleInterest(value: string) {
@@ -132,7 +200,7 @@
     if (!normalized) return;
     interestsTouched = true;
     selectedInterests = selectedInterests.includes(normalized)
-      ? selectedInterests.filter((i) => i !== normalized)
+      ? selectedInterests.filter((interest) => interest !== normalized)
       : normalizeInterestTags([...selectedInterests, normalized]);
   }
 
@@ -208,67 +276,99 @@
     }
   }
 
-  // ── auth helpers (step 3) ───────────────────────────────────────
-  async function loginWithExtension() {
-    if (!ndk.$sessions || authPending || !extensionAvailable) return;
+  async function readResponseError(response: Response, fallback: string): Promise<string> {
     try {
-      authPending = true;
-      authError = '';
-      await ndk.$sessions.login(new NDKNip07Signer());
-    } catch (caught) {
-      authError = caught instanceof Error ? caught.message : "Couldn't log in with the extension.";
-    } finally {
-      authPending = false;
-    }
+      const payload = (await response.json()) as { error?: string };
+      if (payload.error) return payload.error;
+    } catch {}
+
+    return fallback;
   }
 
-  async function loginWithPrivateKey() {
-    if (!ndk.$sessions || authPending || !privateKey.trim()) return;
-    try {
-      authPending = true;
-      authError = '';
-      await ndk.$sessions.login(new NDKPrivateKeySigner(privateKey.trim()));
-    } catch (caught) {
-      authError = caught instanceof Error ? caught.message : "Couldn't log in with that key.";
-    } finally {
-      authPending = false;
-    }
+  async function buildManagedNip05Auth(
+    action: 'register' | 'clear',
+    domain: string,
+    name?: string
+  ): Promise<NostrEvent> {
+    await ensureClientNdk();
+
+    const authEvent = new NDKEvent(ndk, {
+      kind: NIP05_REGISTRATION_AUTH_KIND,
+      content: '',
+      tags: [
+        ['t', 'nip05-registration'],
+        ['action', action],
+        ['domain', domain],
+        ...(name ? [['name', name]] : [])
+      ]
+    } as NostrEvent);
+
+    await authEvent.sign();
+    return authEvent.rawEvent() as NostrEvent;
   }
 
-  function clearRemoteSigner() {
-    bunkerUri = '';
-    qrCodeDataUrl = '';
-    nostrConnectUri = '';
-    connectingBunker = false;
-    stopNostrConnectSigner(nostrConnectSigner);
-    nostrConnectSigner = null;
-  }
+  async function syncManagedNip05(
+    publishingUser: NDKUser,
+    previousManagedName: string | undefined
+  ): Promise<string | undefined> {
+    if (!managedNip05Domain) return undefined;
 
-  async function startRemoteSigner() {
-    if (!ndk.$sessions || preparingRemoteSigner || connectingBunker) return;
-    try {
-      authError = '';
-      clearRemoteSigner();
-      preparingRemoteSigner = true;
-      const pairing = await prepareRemoteSignerPairing(ndk);
-      nostrConnectSigner = pairing.signer;
-      nostrConnectUri = pairing.nostrConnectUri;
-      qrCodeDataUrl = pairing.qrCodeDataUrl;
-      void ndk.$sessions.login(pairing.signer).catch((caught) => {
-        if (nostrConnectSigner !== pairing.signer) return;
-        authError = caught instanceof Error ? caught.message : "Couldn't connect to that app.";
+    if (!normalizedManagedNip05Name) {
+      if (!managedNip05Touched || !previousManagedName) return undefined;
+
+      const response = await fetch('/api/nip05', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          auth: await buildManagedNip05Auth('clear', managedNip05Domain)
+        })
       });
-    } catch (caught) {
-      authError = caught instanceof Error ? caught.message : "Couldn't start pairing.";
-      clearRemoteSigner();
-    } finally {
-      preparingRemoteSigner = false;
+
+      if (!response.ok) {
+        throw new Error(await readResponseError(response, "Couldn't clear your NIP-05 handle."));
+      }
+
+      managedNip05Status = 'idle';
+      managedNip05StatusPubkey = null;
+      return undefined;
     }
+
+    const response = await fetch('/api/nip05', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: normalizedManagedNip05Name,
+        auth: await buildManagedNip05Auth('register', managedNip05Domain, normalizedManagedNip05Name)
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await readResponseError(response, `Couldn't register ${managedNip05Identifier}.`)
+      );
+    }
+
+    managedNip05Status = 'owned';
+    managedNip05StatusPubkey = publishingUser.pubkey;
+    return formatManagedNip05Identifier(normalizedManagedNip05Name, managedNip05Domain);
   }
 
   // ── publish ─────────────────────────────────────────────────────
   async function publish() {
-    if (!currentUser || isReadOnly) return;
+    if (!ndk.$sessions || !canPublish) return;
+
+    let publishingUser = currentUser;
+    if (!publishingUser) {
+      const signer = NDKPrivateKeySigner.generate();
+      await ndk.$sessions.login(signer);
+      publishingUser = await signer.user();
+    }
+
+    if (!publishingUser || isReadOnly) return;
 
     const nextName = cleanText(name);
     const nextDisplay = cleanText(display);
@@ -278,12 +378,18 @@
     const hasCustomValue = Boolean(cleanText(blossomServer));
     const nextServer = parseBlossomServer(blossomServer) ?? (hasCustomValue ? null : DEFAULT_BLOSSOM_SERVER);
 
-    if (!nextServer) { saveError = 'Enter a valid storage server URL.'; return; }
+    if (!nextServer) {
+      saveError = 'Enter a valid storage server URL.';
+      return;
+    }
 
-    let nextAvatar = cleanText(avatarUrl);
+    let nextAvatar = cleanText(avatarUrl) || selectedDicebear || '';
     if (avatarFile) {
       const uploadedUrl = await uploadAvatarFile();
-      if (!uploadedUrl) { saveError = uploadError || 'Upload failed.'; return; }
+      if (!uploadedUrl) {
+        saveError = uploadError || 'Upload failed.';
+        return;
+      }
       nextAvatar = cleanText(uploadedUrl);
     }
 
@@ -292,8 +398,8 @@
       saving = true;
       await ensureClientNdk();
 
-      const previousProfile = currentUser.profile ? { ...currentUser.profile } : undefined;
-      const nextProfile: NDKUserProfile = { ...(currentUser.profile ?? {}) };
+      const previousProfile = publishingUser.profile ? { ...publishingUser.profile } : undefined;
+      const nextProfile: NDKUserProfile = { ...(publishingUser.profile ?? {}) };
       nextProfile.name = nextName || undefined;
       nextProfile.displayName = nextDisplay || undefined;
       nextProfile.about = nextAbout || undefined;
@@ -302,13 +408,22 @@
       nextProfile.picture = nextAvatar || undefined;
       nextProfile.image = nextAvatar || undefined;
 
-      currentUser.profile = nextProfile;
+      if (managedNip05Enabled && managedNip05Domain) {
+        const nextManagedNip05 = await syncManagedNip05(publishingUser, currentManagedNip05Name);
+        if (managedNip05Touched || currentManagedNip05Name) {
+          nextProfile.nip05 = nextManagedNip05 || undefined;
+        }
+      }
+
+      publishingUser.profile = nextProfile;
       try {
-        await currentUser.publish();
+        await publishingUser.publish();
       } catch (caught) {
-        currentUser.profile = previousProfile;
+        publishingUser.profile = previousProfile;
         throw caught;
       }
+
+      const session = ndk.$sessions.current;
 
       const nextBlossom =
         blossomEvent instanceof NDKBlossomList
@@ -319,7 +434,7 @@
       nextBlossom.servers = mergeBlossomServers(nextServer, nextBlossom.servers);
       nextBlossom.default = nextServer;
       await nextBlossom.publish();
-      currentSession?.events.set(NDKKind.BlossomList, nextBlossom);
+      session?.events.set(NDKKind.BlossomList, nextBlossom);
 
       const nextInterestEvent =
         interestEvent instanceof NDKInterestList
@@ -329,9 +444,9 @@
             : new NDKInterestList(ndk);
       nextInterestEvent.interests = nextInterests;
       await nextInterestEvent.publish();
-      currentSession?.events.set(NDKKind.InterestList, nextInterestEvent);
+      session?.events.set(NDKKind.InterestList, nextInterestEvent);
 
-      await goto(`/profile/${profileIdentifier(nextProfile, currentUser.npub)}`);
+      await goto(`/profile/${profileIdentifier(nextProfile, publishingUser.npub)}`);
     } catch (caught) {
       saveError = caught instanceof Error ? caught.message : "Couldn't publish your profile.";
     } finally {
@@ -358,17 +473,32 @@
   });
 
   $effect(() => {
-    if (!interestsTouched) selectedInterests = interestTagsFromEvent(interestEvent as NDKEvent | null | undefined);
+    if (!interestsTouched) {
+      selectedInterests = interestTagsFromEvent(interestEvent as NDKEvent | null | undefined);
+    }
   });
 
   $effect(() => {
-    if (!blossomTouched) blossomServer = blossomServerFromEvent(blossomEvent as NDKEvent | null | undefined);
+    if (!blossomTouched) {
+      blossomServer = blossomServerFromEvent(blossomEvent as NDKEvent | null | undefined);
+    }
+  });
+
+  $effect(() => {
+    if (!managedNip05Domain) {
+      managedNip05Name = '';
+      managedNip05Touched = false;
+      managedNip05Status = 'idle';
+      managedNip05StatusPubkey = null;
+    }
   });
 
   $effect(() => {
     if (!currentUser?.pubkey || currentUser.profile || profileLoading) return;
+
     const targetPubkey = currentUser.pubkey;
     profileLoading = true;
+
     void currentUser.fetchProfile()
       .then((profile) => {
         if (currentUser?.pubkey !== targetPubkey) return;
@@ -384,31 +514,86 @@
       });
   });
 
+  $effect(() => {
+    if (typeof window === 'undefined') return;
+
+    const domain = managedNip05Domain;
+    const desiredName = normalizedManagedNip05Name;
+    const viewerPubkey = currentUser?.pubkey ?? null;
+
+    if (!domain || !desiredName) {
+      managedNip05Status = 'idle';
+      managedNip05StatusPubkey = null;
+      return;
+    }
+
+    if (!isValidManagedNip05Name(desiredName)) {
+      managedNip05Status = 'idle';
+      managedNip05StatusPubkey = null;
+      return;
+    }
+
+    managedNip05Status = 'checking';
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      void fetch(`/api/nip05?name=${encodeURIComponent(desiredName)}`, {
+        signal: controller.signal
+      })
+        .then(async (response) => {
+          if (!response.ok) throw new Error('lookup failed');
+
+          const payload = (await response.json()) as {
+            exists: boolean;
+            pubkey: string | null;
+          };
+
+          managedNip05StatusPubkey = payload.pubkey;
+
+          if (!payload.exists) {
+            managedNip05Status = 'available';
+            return;
+          }
+
+          managedNip05Status = payload.pubkey && viewerPubkey === payload.pubkey ? 'owned' : 'taken';
+        })
+        .catch((error) => {
+          if (controller.signal.aborted) return;
+          console.error('NIP-05 availability lookup failed:', error);
+          managedNip05Status = 'error';
+          managedNip05StatusPubkey = null;
+        });
+    }, 250);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeoutId);
+    };
+  });
+
   onDestroy(() => {
     clearAvatarPreview();
-    stopNostrConnectSigner(nostrConnectSigner);
   });
 </script>
 
 <div class="ob-shell">
-  <!-- progress -->
   <nav class="ob-progress" aria-label="Setup steps">
-    {#each [1, 2, 3] as s (s)}
+    {#each [1, 2] as s (s)}
       <button
         class="ob-progress-step"
         class:active={step === s}
         class:done={step > s}
         type="button"
-        onclick={() => { if (s < step || (s === 2 && step1Valid) || (s === 3 && step1Valid && step2Valid)) step = s as 1|2|3; }}
+        onclick={() => {
+          if (s < step || (s === 2 && step1Valid)) step = s as 1 | 2;
+        }}
         aria-current={step === s ? 'step' : undefined}
       >
         <span class="ob-progress-dot"></span>
-        <span class="ob-progress-label">{['About you', 'Interests', 'Publish'][s - 1]}</span>
+        <span class="ob-progress-label">{['About you', 'Interests'][s - 1]}</span>
       </button>
     {/each}
   </nav>
 
-  <!-- step 1: about you -->
   {#if step === 1}
     <div class="ob-step reveal">
       <div class="ob-step-head">
@@ -417,30 +602,64 @@
       </div>
 
       <div class="ob-step-body">
-        <!-- avatar -->
         <div class="ob-avatar-zone">
-          <button class="ob-avatar-btn" type="button" onclick={handleAvatarClick} aria-label="Upload photo">
+          <button class="ob-avatar-btn" type="button" onclick={handleAvatarClick} aria-label="Upload your own photo">
             {#if avatarDisplayUrl}
               <img src={avatarDisplayUrl} alt="Your avatar" class="ob-avatar-img" />
             {:else}
               <div class="ob-avatar-placeholder">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Zm0 0v0M15.5 20H8.5A6.5 6.5 0 0 1 2 13.5v0" />
-                  <circle cx="12" cy="12" r="10" />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
                 </svg>
-                <span>Add photo</span>
               </div>
             {/if}
-            <div class="ob-avatar-overlay">
+            <div class="ob-avatar-overlay" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
               </svg>
             </div>
           </button>
           <input bind:this={fileInput} type="file" accept="image/*" onchange={handleAvatarSelection} class="ob-file-input" tabindex="-1" />
+
+          <div class="ob-dicebear-wrap">
+            <p class="ob-dicebear-label">Or pick one</p>
+            <div class="ob-dicebear-track" role="listbox" aria-label="Avatar options">
+              {#each DICEBEAR_AVATARS as avatar (avatar.url)}
+                <button
+                  class="ob-dicebear-item"
+                  class:selected={selectedDicebear === avatar.url}
+                  type="button"
+                  role="option"
+                  aria-selected={selectedDicebear === avatar.url}
+                  onclick={() => {
+                    selectedDicebear = avatar.url;
+                    avatarUrl = '';
+                    avatarFile = null;
+                    clearAvatarPreview();
+                    if (fileInput) fileInput.value = '';
+                    profileTouched = true;
+                  }}
+                >
+                  <img src={avatar.url} alt={avatar.seed} loading="lazy" />
+                </button>
+              {/each}
+            </div>
+          </div>
+
           {#if avatarDisplayUrl}
-            <button class="ob-avatar-remove" type="button" onclick={() => { avatarUrl = ''; avatarFile = null; clearAvatarPreview(); if (fileInput) fileInput.value = ''; }}>
-              Remove
+            <button
+              class="ob-avatar-remove"
+              type="button"
+              onclick={() => {
+                avatarUrl = '';
+                avatarFile = null;
+                selectedDicebear = null;
+                clearAvatarPreview();
+                if (fileInput) fileInput.value = '';
+              }}
+            >
+              Remove photo
             </button>
           {/if}
           {#if uploadError}
@@ -448,33 +667,85 @@
           {/if}
         </div>
 
-        <!-- name fields -->
         <div class="ob-fields">
           <div class="ob-field-row">
             <label class="ob-field">
-              <span>Name</span>
+              <span>Username</span>
               <input
                 bind:value={name}
-                oninput={() => { profileTouched = true; }}
-                placeholder="Your name"
-                autocomplete="name"
+                oninput={() => {
+                  profileTouched = true;
+                }}
+                placeholder={namePlaceholder}
+                autocomplete="username"
               />
             </label>
             <label class="ob-field">
-              <span>Display name <em>(optional)</em></span>
+              <span>Name <em>(optional)</em></span>
               <input
                 bind:value={display}
-                oninput={() => { profileTouched = true; }}
-                placeholder="How you want to appear"
+                oninput={() => {
+                  profileTouched = true;
+                }}
+                placeholder="Your full name"
+                autocomplete="name"
               />
             </label>
           </div>
+
+          {#if managedNip05Enabled && managedNip05Domain}
+            <label class="ob-field">
+              <span>Verified handle <em>(optional)</em></span>
+              <div class="ob-managed-nip05-input">
+                <input
+                  bind:value={managedNip05Name}
+                  oninput={() => {
+                    managedNip05Touched = true;
+                  }}
+                  placeholder="writer"
+                  autocomplete="off"
+                  autocapitalize="none"
+                  autocorrect="off"
+                  spellcheck="false"
+                />
+                <span class="ob-managed-nip05-domain">@{managedNip05Domain}</span>
+              </div>
+              <p class="ob-managed-nip05-note">
+                Reserve a NIP-05 handle on @{managedNip05Domain}. Leave it blank to skip.
+              </p>
+              {#if existingExternalNip05}
+                <p class="ob-managed-nip05-note">
+                  Your current profile already advertises {existingExternalNip05}. Leaving this blank keeps that value.
+                </p>
+              {/if}
+              {#if !data.nip05Persistent}
+                <p class="ob-managed-nip05-note">
+                  This deployment is using the in-memory fallback. Add `KV_REST_API_URL` and `KV_REST_API_TOKEN` for durable registrations.
+                </p>
+              {/if}
+              {#if normalizedManagedNip05Name && !managedNip05Valid}
+                <p class="ob-error">Use 1-64 lowercase letters, numbers, hyphens, or underscores.</p>
+              {:else if managedNip05Status === 'checking'}
+                <p class="ob-managed-nip05-status">Checking {managedNip05Identifier}…</p>
+              {:else if managedNip05Status === 'available'}
+                <p class="ob-managed-nip05-status success">{managedNip05Identifier} is available.</p>
+              {:else if managedNip05Status === 'owned'}
+                <p class="ob-managed-nip05-status success">{managedNip05Identifier} is already linked to this session.</p>
+              {:else if managedNip05Status === 'taken'}
+                <p class="ob-managed-nip05-status">That handle is already registered.</p>
+              {:else if managedNip05Status === 'error'}
+                <p class="ob-error">Couldn't check that handle right now.</p>
+              {/if}
+            </label>
+          {/if}
 
           <label class="ob-field">
             <span>Bio <em>(optional)</em></span>
             <textarea
               bind:value={about}
-              oninput={() => { profileTouched = true; }}
+              oninput={() => {
+                profileTouched = true;
+              }}
               placeholder="What do you write about?"
               rows="3"
             ></textarea>
@@ -484,7 +755,9 @@
             <span>Website <em>(optional)</em></span>
             <input
               bind:value={website}
-              oninput={() => { profileTouched = true; }}
+              oninput={() => {
+                profileTouched = true;
+              }}
               placeholder="https://yoursite.com"
               type="url"
             />
@@ -497,17 +770,17 @@
           class="button ob-next"
           type="button"
           disabled={!step1Valid}
-          onclick={() => step = 2}
+          onclick={() => {
+            step = 2;
+          }}
         >
           Next — pick your interests
         </button>
         {#if !step1Valid}
-          <p class="ob-hint">Add a name to continue</p>
+          <p class="ob-hint">Add a name and resolve any handle conflicts to continue.</p>
         {/if}
       </div>
     </div>
-
-  <!-- step 2: interests -->
   {:else if step === 2}
     <div class="ob-step reveal">
       <div class="ob-step-head">
@@ -543,7 +816,14 @@
         {#if normalizedInterests.length > 0}
           <div class="ob-selected-interests">
             {#each normalizedInterests as interest (interest)}
-              <button class="ob-selected-chip" type="button" onclick={() => { interestsTouched = true; selectedInterests = selectedInterests.filter(i => i !== interest); }}>
+              <button
+                class="ob-selected-chip"
+                type="button"
+                onclick={() => {
+                  interestsTouched = true;
+                  selectedInterests = selectedInterests.filter((value) => value !== interest);
+                }}
+              >
                 #{interest} ×
               </button>
             {/each}
@@ -553,126 +833,18 @@
 
       <div class="ob-step-footer">
         <div class="ob-footer-row">
-          <button class="button-secondary" type="button" onclick={() => step = 1}>Back</button>
-          <button
-            class="button ob-next"
-            type="button"
-            disabled={!step2Valid}
-            onclick={() => step = 3}
-          >
-            Next — create your account
-          </button>
-        </div>
-        {#if !step2Valid}
-          <p class="ob-hint">Pick at least one topic to continue</p>
-        {/if}
-      </div>
-    </div>
-
-  <!-- step 3: connect & publish -->
-  {:else}
-    <div class="ob-step reveal">
-      <div class="ob-step-head">
-        {#if currentUser}
-          <h1>You're all set, {writerLabel}</h1>
-          <p>Review your profile and hit publish.</p>
-        {:else}
-          <h1>Last step — connect your account</h1>
-          <p>Sign in to publish your profile to the network.</p>
-        {/if}
-      </div>
-
-      <div class="ob-step-body">
-        {#if !currentUser}
-          <!-- auth options -->
-          <div class="ob-auth">
-            <div class="ob-auth-tabs">
-              <button class="ob-auth-tab" class:active={authMode === 'extension'} type="button" onclick={() => authMode = 'extension'}>Extension</button>
-              <button class="ob-auth-tab" class:active={authMode === 'private-key'} type="button" onclick={() => authMode = 'private-key'}>Secret key</button>
-              <button class="ob-auth-tab" class:active={authMode === 'remote'} type="button" onclick={() => authMode = 'remote'}>Another app</button>
-            </div>
-
-            {#if authMode === 'extension'}
-              <div class="ob-auth-panel">
-                <p class="ob-auth-desc">Use a Nostr browser extension like Alby or nos2x.</p>
-                <button class="button ob-auth-action" type="button" onclick={loginWithExtension} disabled={authPending || !extensionAvailable}>
-                  {authPending ? 'Connecting…' : extensionAvailable ? 'Continue with extension' : 'No extension detected'}
-                </button>
-              </div>
-
-            {:else if authMode === 'private-key'}
-              <div class="ob-auth-panel">
-                <p class="ob-auth-desc">Paste your nsec or hex private key.</p>
-                <textarea class="ob-auth-key" bind:value={privateKey} placeholder="nsec1… or hex key" rows="2"></textarea>
-                <button class="button ob-auth-action" type="button" onclick={loginWithPrivateKey} disabled={authPending || !privateKey.trim()}>
-                  {authPending ? 'Signing in…' : 'Continue with key'}
-                </button>
-              </div>
-
-            {:else}
-              <div class="ob-auth-panel">
-                <p class="ob-auth-desc">Scan with a Nostr signing app or paste a bunker:// link.</p>
-                {#if qrCodeDataUrl}
-                  <div class="ob-qr">
-                    <img src={qrCodeDataUrl} alt="QR code" />
-                  </div>
-                {/if}
-                {#if !qrCodeDataUrl}
-                  <button class="button ob-auth-action" type="button" onclick={startRemoteSigner} disabled={preparingRemoteSigner}>
-                    {preparingRemoteSigner ? 'Generating…' : 'Show QR code'}
-                  </button>
-                {/if}
-              </div>
-            {/if}
-
-            {#if authError}
-              <p class="ob-error">{authError}</p>
-            {/if}
-          </div>
-        {/if}
-
-        <!-- profile summary -->
-        <div class="ob-summary">
-          <div class="ob-summary-avatar">
-            {#if avatarDisplayUrl}
-              <img src={avatarDisplayUrl} alt="" />
-            {:else}
-              <span>{writerLabel.slice(0, 1).toUpperCase()}</span>
-            {/if}
-          </div>
-          <div class="ob-summary-info">
-            <strong class="ob-summary-name">{writerLabel}</strong>
-            {#if cleanText(about)}
-              <p class="ob-summary-bio">{cleanText(about)}</p>
-            {/if}
-            {#if normalizedInterests.length > 0}
-              <div class="ob-summary-interests">
-                {#each normalizedInterests.slice(0, 5) as interest (interest)}
-                  <span class="ob-summary-chip">#{interest}</span>
-                {/each}
-                {#if normalizedInterests.length > 5}
-                  <span class="ob-summary-chip muted">+{normalizedInterests.length - 5} more</span>
-                {/if}
-              </div>
-            {/if}
-          </div>
-        </div>
-      </div>
-
-      <div class="ob-step-footer">
-        <div class="ob-footer-row">
-          <button class="button-secondary" type="button" onclick={() => step = 2}>Back</button>
+          <button class="button-secondary" type="button" onclick={() => { step = 1; }}>Back</button>
           <button
             class="button ob-next"
             type="button"
             disabled={!canPublish}
             onclick={() => void publish()}
           >
-            {saving ? 'Publishing…' : 'Publish profile'}
+            {saving ? 'Publishing…' : 'Start reading'}
           </button>
         </div>
-        {#if !currentUser}
-          <p class="ob-hint">Connect an account above to publish</p>
+        {#if !step2Valid}
+          <p class="ob-hint">Pick at least one topic to continue.</p>
         {/if}
         {#if saveError}
           <p class="ob-error">{saveError}</p>
@@ -681,3 +853,38 @@
     </div>
   {/if}
 </div>
+
+<style>
+  .ob-managed-nip05-input {
+    align-items: center;
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .ob-managed-nip05-domain {
+    color: rgba(255, 255, 255, 0.62);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+
+  .ob-managed-nip05-note,
+  .ob-managed-nip05-status {
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 0.92rem;
+    line-height: 1.5;
+    margin: 0.55rem 0 0;
+  }
+
+  .ob-managed-nip05-status.success {
+    color: #9ed0ad;
+  }
+
+  @media (max-width: 720px) {
+    .ob-managed-nip05-input {
+      gap: 0.5rem;
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

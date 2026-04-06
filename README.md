@@ -1,13 +1,22 @@
 # SvelteKit + NDK Template
 
-This template is a minimal Svelte 5 + `@nostr-dev-kit/svelte` project that is designed around the same separation that makes Wikifreedia's SSR work reliably:
+Ship a real Nostr web app without spending your first week rebuilding SSR, auth, SEO, onboarding, and deployment plumbing.
 
-- browser interactivity uses `NDKSvelte`
-- `+page.server.ts` loads use plain `NDK`
-- route metadata is generated on the server for Open Graph and Twitter previews
-- login is included with NIP-07 and private-key flows
-- registry-backed UI primitives are wired through jsrepo with `@ndk/svelte`
-- deployment targets Vercel via `@sveltejs/adapter-vercel`
+This template gives you the hard parts up front: server-rendered pages that still feel live, session-aware client UX, shareable previews, reusable NDK primitives, and a deployment path that already makes sense.
+
+The included UI uses profiles, notes, articles, comments, and highlights to show the stack in action. Those are examples of what the foundation supports, not the limit of what you can build with it.
+
+## What You Get
+
+- SSR that works for crawlers, links, and real users
+- live client updates layered on top of server-rendered pages
+- built-in SEO and social previews, including dynamic OG images
+- login flows for common Nostr signer setups
+- onboarding for profiles, interests, and Blossom-backed avatars
+- optional managed NIP-05 registration with username availability checks and `.well-known/nostr.json`
+- reusable `@ndk/svelte` primitives already wired into the app structure
+- example app surfaces for profiles, event pages, threaded discussion, and richer content views
+- Vercel-ready deployment without extra platform setup work
 
 ## Why the split matters
 
@@ -56,12 +65,31 @@ PUBLIC_NOSTR_RELAYS=wss://relay.damus.io,wss://purplepag.es,wss://relay.primal.n
 
 If omitted, the template uses those three relays by default.
 
+To enable managed NIP-05 registration in onboarding, add:
+
+```bash
+PUBLIC_NIP05_DOMAIN=your-domain.com
+```
+
+The value can be a bare domain or a full URL. If set, onboarding shows an optional handle field, checks `username@your-domain.com` availability, and the app serves `/.well-known/nostr.json`.
+
+For durable registrations on Vercel, also provide a writable KV-compatible store:
+
+```bash
+KV_REST_API_URL=
+KV_REST_API_TOKEN=
+```
+
+Without those two variables, the template falls back to an in-memory registry that is only suitable for local development.
+
 ## Deploying to Vercel
 
 1. Import the project into Vercel.
 2. Leave the framework preset on `SvelteKit`.
 3. Add `PUBLIC_NOSTR_RELAYS` if you want custom relays.
-4. Deploy.
+4. Add `PUBLIC_NIP05_DOMAIN` if you want the template to issue handles for your domain.
+5. Add `KV_REST_API_URL` and `KV_REST_API_TOKEN` if you want those handle registrations to persist across instances.
+6. Deploy.
 
 No custom `vercel.json` is required for the base template.
 
