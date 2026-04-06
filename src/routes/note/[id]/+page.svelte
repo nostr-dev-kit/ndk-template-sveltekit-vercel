@@ -316,10 +316,6 @@
 
                 {@render renderComments(commentTree)}
               </div>
-            {:else}
-              <div class="tab-empty-state">
-                <p class="muted" style="margin: 0;">No NIP-22 comments are attached to this article yet.</p>
-              </div>
             {/if}
           </Tabs.Content>
 
@@ -358,15 +354,9 @@
 
                     {#if tagValue(highlight.tags, 'context')}
                       <p class="caption" style="margin: 0;">Context: {tagValue(highlight.tags, 'context')}</p>
-                    {/if}
-                  </article>
-                {/each}
-              </div>
-            {:else}
-              <div class="tab-empty-state">
-                <p class="muted" style="margin: 0;">
-                  No NIP-84 highlights have been published for this article yet.
-                </p>
+                  {/if}
+                </article>
+              {/each}
               </div>
             {/if}
           </Tabs.Content>
