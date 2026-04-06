@@ -37,6 +37,17 @@
   const liveArticles = $derived(mergeUniqueArticles(recentArticles.events, seedArticles, 12));
   const articles = $derived(liveArticles.length > 0 ? liveArticles : seedArticles);
   const activeComments = $derived(discussedComments.events.slice(0, 6));
+  const commentCountsByArticle = $derived.by(() => {
+    const counts = new Map<string, number>();
+    for (const comment of discussedComments.events) {
+      const ref =
+        comment.tags.find((tag) => tag[0] === 'a')?.[1]?.trim() ||
+        comment.tags.find((tag) => tag[0] === 'e')?.[1]?.trim() ||
+        '';
+      if (ref) counts.set(ref, (counts.get(ref) ?? 0) + 1);
+    }
+    return counts;
+  });
   const articleLookup = $derived.by(() => {
     const lookup = new Map<string, NDKEvent>();
 
@@ -163,6 +174,9 @@
                 <span class="story-pub-meta">
                   <span>{formatDisplayDate(articlePublishedAt(event.rawEvent()))}</span>
                   <span>{articleReadTimeMinutes(event.content)} min read</span>
+                  {#if (commentCountsByArticle.get(event.tagId()) ?? 0) > 0}
+                    <span class="story-comment-count">{commentCountsByArticle.get(event.tagId())} comments</span>
+                  {/if}
                 </span>
               </div>
             </div>
@@ -337,6 +351,10 @@
     align-items: center;
     gap: 0.75rem;
     padding-top: 0.25rem;
+  }
+
+  .story-comment-count {
+    color: var(--accent);
   }
 
   .article-feed-thumb {
