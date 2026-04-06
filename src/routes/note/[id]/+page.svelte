@@ -28,6 +28,7 @@
   import EventAuthorHeader from '$lib/components/EventAuthorHeader.svelte';
   import BookmarkIcon from '$lib/components/BookmarkIcon.svelte';
   import HighlightPopover from '$lib/components/HighlightPopover.svelte';
+  import SharePopover from '$lib/components/SharePopover.svelte';
   import { mergeUniqueEvents } from '$lib/ndk/events';
 
   let { data }: PageProps = $props();
@@ -139,6 +140,7 @@
     return nip05 && nip05 !== authorName ? nip05 : '';
   });
   const articleAddress = $derived(isArticle && event ? event.tagId() : '');
+  const shareUrl = $derived(browser ? page.url.href : '');
   const articleEventId = $derived(event?.id ?? '');
   const commentCount = $derived(commentEvents.length);
   const highlightCount = $derived(highlightEvents.length);
@@ -314,17 +316,25 @@
           </div>
         </User.Root>
 
-        {#if currentUser && isArticle}
-          <button
-            class="bookmark-btn"
-            class:bookmarked={isBookmarked}
-            disabled={bookmarking}
-            title={isBookmarked ? 'Remove bookmark' : 'Bookmark this article'}
-            onclick={toggleBookmark}
-          >
-            <BookmarkIcon filled={isBookmarked} />
-          </button>
-        {/if}
+        <div class="article-actions">
+          {#if isArticle}
+            <SharePopover
+              url={shareUrl}
+              title={isArticle ? articleTitle(event.rawEvent()) : noteTitle(event.rawEvent())}
+            />
+          {/if}
+          {#if currentUser && isArticle}
+            <button
+              class="bookmark-btn"
+              class:bookmarked={isBookmarked}
+              disabled={bookmarking}
+              title={isBookmarked ? 'Remove bookmark' : 'Bookmark this article'}
+              onclick={toggleBookmark}
+            >
+              <BookmarkIcon filled={isBookmarked} />
+            </button>
+          {/if}
+        </div>
       </div>
 
       <p class="lede" style="margin: 0;">
@@ -348,6 +358,44 @@
           <Tabs.Content value="article" class="article-tab-panel">
             <div bind:this={articleContentEl}>
               <ArticleMarkdown content={event.content} tags={event.tags} highlights={highlightEvents} />
+            </div>
+            <div class="share-footer">
+              <p class="share-footer-label">Share this article</p>
+              <div class="share-footer-actions">
+                <a
+                  class="share-footer-btn"
+                  href="https://x.com/intent/tweet?text={encodeURIComponent(articleTitle(event.rawEvent()))}&url={encodeURIComponent(shareUrl)}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                  X / Twitter
+                </a>
+                <a
+                  class="share-footer-btn"
+                  href="https://www.facebook.com/sharer/sharer.php?u={encodeURIComponent(shareUrl)}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                  Facebook
+                </a>
+                <a
+                  class="share-footer-btn"
+                  href="https://www.linkedin.com/sharing/share-offsite/?url={encodeURIComponent(shareUrl)}"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  </svg>
+                  LinkedIn
+                </a>
+              </div>
             </div>
           </Tabs.Content>
 
@@ -501,10 +549,19 @@
     gap: 1.35rem;
   }
 
+  /* ── article actions (share + bookmark) ──────────────────── */
+
+  .article-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
   /* ── bookmark button ──────────────────────────────────────── */
 
   .bookmark-btn {
-    margin-left: auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -677,5 +734,59 @@
 
   .comment-children .comment-node + .comment-node {
     border-top: 1px solid var(--border-light);
+  }
+
+  /* ── share footer ──────────────────────────────────────────── */
+
+  .share-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 2.5rem 0 1rem;
+    border-top: 1px solid var(--border-light);
+    margin-top: 2.5rem;
+  }
+
+  .share-footer-label {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .share-footer-actions {
+    display: flex;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .share-footer-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 120ms ease;
+    white-space: nowrap;
+  }
+
+  .share-footer-btn:hover {
+    border-color: var(--text);
+    background: var(--surface-hover, rgba(0, 0, 0, 0.03));
+  }
+
+  .share-footer-btn:active {
+    transform: scale(0.97);
   }
 </style>
