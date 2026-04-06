@@ -15,11 +15,11 @@
   // ── NIP-11 metadata ──────────────────────────────────────────
   const relayInfo = createRelayInfo(() => ({ relayUrl }), ndk);
 
-  // ── Bookmark state (kind 10006) ──────────────────────────────
+  // ── Bookmark state (kind 10012) ──────────────────────────────
   const myRelaySet = ndk.$subscribe(() => {
     if (!browser || !currentUser) return undefined;
     return {
-      filters: [{ kinds: [10006 as number], authors: [currentUser.pubkey], limit: 1 }]
+      filters: [{ kinds: [10012 as number], authors: [currentUser.pubkey], limit: 1 }]
     };
   });
 
@@ -33,7 +33,7 @@
     if (!currentUser) return;
     const existing = myRelaySet.events[0];
     const updated = new NDKEvent(ndk);
-    updated.kind = 10006;
+    updated.kind = 10012;
     if (isBookmarked) {
       updated.tags = existing
         ? existing.tags.filter((tag) => !(tag[0] === 'relay' && tag[1] === relayUrl))

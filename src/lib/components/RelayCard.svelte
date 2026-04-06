@@ -30,8 +30,10 @@
   }
 
   const hostname = $derived(hostnameFromUrl(relayUrl));
+  const hasNip11 = $derived(!relayInfo.loading && relayInfo.nip11?.name);
 </script>
 
+{#if hasNip11}
 <a class="relay-card" href={`/relay/${hostname}`}>
   <div class="relay-card-icon">
     {#if relayInfo.nip11?.icon}
@@ -74,3 +76,4 @@
     </button>
   {/if}
 </a>
+{/if}

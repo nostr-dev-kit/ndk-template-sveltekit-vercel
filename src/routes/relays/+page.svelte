@@ -6,11 +6,11 @@
 
   const currentUser = $derived(ndk.$currentUser);
 
-  // ── My Relays (kind 10006) ────────────────────────────────────
+  // ── My Relays (kind 10012) ────────────────────────────────────
   const myRelaySet = ndk.$subscribe(() => {
     if (!browser || !currentUser) return undefined;
     return {
-      filters: [{ kinds: [10006 as number], authors: [currentUser.pubkey], limit: 1 }]
+      filters: [{ kinds: [10012 as number], authors: [currentUser.pubkey], limit: 1 }]
     };
   });
 
@@ -25,7 +25,7 @@
     const existing = myRelaySet.events[0];
     if (!existing) return;
     const updated = new NDKEvent(ndk);
-    updated.kind = 10006;
+    updated.kind = 10012;
     updated.tags = existing.tags.filter((tag) => !(tag[0] === 'relay' && tag[1] === relayUrl));
     await updated.publish();
   }
@@ -34,7 +34,7 @@
     if (!currentUser) return;
     const existing = myRelaySet.events[0];
     const updated = new NDKEvent(ndk);
-    updated.kind = 10006;
+    updated.kind = 10012;
     updated.tags = existing ? [...existing.tags, ['relay', relayUrl]] : [['relay', relayUrl]];
     await updated.publish();
   }
@@ -51,11 +51,11 @@
     }
   }
 
-  // ── Network relay discovery (kind 10006) ──────────────────────
+  // ── Network relay discovery (kind 10012) ──────────────────────
   const networkRelaySets = ndk.$subscribe(() => {
     if (!browser) return undefined;
     return {
-      filters: [{ kinds: [10006 as number], limit: 100 }]
+      filters: [{ kinds: [10012 as number], limit: 100 }]
     };
   });
 
