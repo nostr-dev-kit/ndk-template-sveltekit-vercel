@@ -60,10 +60,19 @@
   const featuredArticle = $derived.by(() =>
     articles.find((event) => Boolean(articleImageUrl(event.rawEvent())))
   );
+  const featuredTitle = $derived(featuredArticle ? articleTitle(featuredArticle.rawEvent()) : '');
   const featuredImage = $derived(featuredArticle ? articleImageUrl(featuredArticle.rawEvent()) : undefined);
   const featuredTopics = $derived(
     featuredArticle ? articleTopics(featuredArticle.rawEvent(), 2) : []
   );
+  const featuredTitleSize = $derived.by(() => {
+    const wordCount = featuredTitle.split(/\s+/).filter(Boolean).length;
+    const characterCount = featuredTitle.length;
+
+    if (characterCount > 92 || wordCount > 12) return 'compact';
+    if (characterCount > 68 || wordCount > 9) return 'balanced';
+    return 'default';
+  });
   const nonFeaturedArticles = $derived.by(() => {
     const featuredId = featuredArticle?.tagId();
     if (!featuredId) return articles;
@@ -122,7 +131,7 @@
           class:loaded={featuredImageLoaded}
           class="lead-story-image"
           src={featuredImage}
-          alt={articleTitle(featuredArticle.rawEvent())}
+          alt={featuredTitle}
           loading="eager"
           decoding="async"
           fetchpriority="high"
@@ -136,18 +145,16 @@
             {/each}
           </div>
 
-          <div class="story-pub-meta lead-story-meta">
-            <span>{formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent()))}</span>
-            <span>{articleReadTimeMinutes(featuredArticle.content)} min read</span>
-          </div>
-
           <div class="lead-story-body">
-            <h1>{articleTitle(featuredArticle.rawEvent())}</h1>
+            <h1 class="lead-story-title" data-size={featuredTitleSize}>{featuredTitle}</h1>
+            <div class="story-pub-meta lead-story-meta">
+              <span>{formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent()))}</span>
+              <span>{articleReadTimeMinutes(featuredArticle.content)} min read</span>
+            </div>
+            <div class="story-byline lead-story-byline">
+              <StoryAuthor {ndk} pubkey={featuredArticle.pubkey} avatarClass="article-author-avatar" />
+            </div>
             <p class="lead-deck">{articleSummary(featuredArticle.rawEvent(), 360)}</p>
-          </div>
-
-          <div class="story-byline">
-            <StoryAuthor {ndk} pubkey={featuredArticle.pubkey} avatarClass="article-author-avatar" />
           </div>
         </div>
       </div>
@@ -266,3 +273,81 @@
     </div>
   </section>
 {/if}
+
+<style>
+  .lead-story-copy {
+    display: grid;
+    align-content: end;
+    gap: 1rem;
+  }
+
+  .lead-story-body {
+    max-width: min(54rem, 82%);
+    gap: 0.8rem;
+  }
+
+  .lead-story-title {
+    max-width: 16ch;
+    font-size: clamp(2.35rem, 4vw, 4.15rem);
+    line-height: 0.94;
+    letter-spacing: -0.055em;
+  }
+
+  .lead-story-title[data-size='balanced'] {
+    max-width: 18ch;
+    font-size: clamp(2.1rem, 3.45vw, 3.45rem);
+    line-height: 0.96;
+    letter-spacing: -0.045em;
+  }
+
+  .lead-story-title[data-size='compact'] {
+    max-width: 20ch;
+    font-size: clamp(1.8rem, 2.95vw, 2.85rem);
+    line-height: 0.98;
+    letter-spacing: -0.035em;
+  }
+
+  .lead-story-meta {
+    font-size: 0.88rem;
+  }
+
+  .lead-story-byline {
+    align-items: flex-start;
+  }
+
+  .lead-story-byline :global(.story-author-name) {
+    color: #fffaf0;
+  }
+
+  .lead-story-byline :global(.story-author-handle) {
+    color: rgba(255, 250, 240, 0.72);
+  }
+
+  .lead-story-byline :global(.registry-user-avatar.article-author-avatar) {
+    border-color: rgba(255, 250, 240, 0.32);
+    background: rgba(255, 250, 240, 0.08);
+  }
+
+  @media (max-width: 720px) {
+    .lead-story-copy {
+      gap: 0.8rem;
+    }
+
+    .lead-story-body {
+      max-width: 100%;
+    }
+
+    .lead-story-title,
+    .lead-story-title[data-size='balanced'],
+    .lead-story-title[data-size='compact'] {
+      max-width: 100%;
+      font-size: clamp(1.85rem, 8vw, 2.9rem);
+      line-height: 0.98;
+      letter-spacing: -0.04em;
+    }
+
+    .lead-story-meta {
+      font-size: 0.82rem;
+    }
+  }
+</style>
