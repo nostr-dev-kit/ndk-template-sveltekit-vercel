@@ -1,32 +1,29 @@
 <script lang="ts">
-  import { reveal } from '$lib/actions/reveal';
 </script>
 
-<section class="hero section reveal" use:reveal>
-  <h1>A calmer way to read and share long-form writing from Nostr.</h1>
-  <p class="lede">
-    Relay Press turns posts into clean, readable pages that are easy to share, revisit, and pass
-    around. Stories open as proper articles, writer pages gather someone's work in one place, and
-    links carry a useful preview when they travel.
-  </p>
-  <div class="actions">
-    <a class="button" href="/">Start reading</a>
-  </div>
-  <p class="caption">
-    Built for readers first: clear typography, portable identity, and writing that feels at home on
-    the open web.
-  </p>
-</section>
-
-<section class="section bento">
-  <article class="panel span-8 reveal" use:reveal>
-    <div class="panel-header">
-      <h2>Writing deserves pages that feel finished.</h2>
-      <p class="muted">
-        A good reading app should disappear behind the work. Relay Press keeps the focus on the
-        story, the author, and the link you can send to someone else.
-      </p>
+<section class="about-container">
+  <div class="about-hero">
+    <h1>A calmer way to read and share long-form writing from Nostr.</h1>
+    <p class="lede">
+      Relay Press turns posts into clean, readable pages that are easy to share, revisit, and pass
+      around. Stories open as proper articles, writer pages gather someone's work in one place, and
+      links carry a useful preview when they travel.
+    </p>
+    <div class="actions">
+      <a class="button" href="/">Start reading</a>
     </div>
+    <p class="caption">
+      Built for readers first: clear typography, portable identity, and writing that feels at home on
+      the open web.
+    </p>
+  </div>
+
+  <div class="about-section">
+    <h2>Writing deserves pages that feel finished.</h2>
+    <p class="muted">
+      A good reading app should disappear behind the work. Relay Press keeps the focus on the
+      story, the author, and the link you can send to someone else.
+    </p>
 
     <div class="definition-list">
       <div class="definition-row">
@@ -42,9 +39,9 @@
         <p>Come back to an author page and pick up where you left off.</p>
       </div>
     </div>
-  </article>
+  </div>
 
-  <article class="panel span-4 reveal" style="--index: 1;" use:reveal>
+  <div class="about-section">
     <h3>The experience stays simple.</h3>
     <div class="definition-list">
       <div class="definition-row">
@@ -60,75 +57,55 @@
         <p>Shared pages keep their title, summary, and image wherever they land.</p>
       </div>
     </div>
-  </article>
-</section>
+  </div>
 
-<section class="section bento">
-  <article class="panel span-4 reveal" use:reveal>
+  <div class="about-section">
     <h3>Clear hierarchy, generous spacing, and room for the writing to breathe.</h3>
-    <p class="muted" style="margin: 0;">
+    <p class="muted">
       Relay Press avoids pushing readers into raw identifiers, implementation details, or cluttered
       layouts.
     </p>
-  </article>
+  </div>
 
-  <article class="panel span-4 reveal" style="--index: 1;" use:reveal>
+  <div class="about-section">
     <h3>Bring the Nostr account you already use without giving up a familiar reading flow.</h3>
-    <p class="muted" style="margin: 0;">
+    <p class="muted">
       Log in from a browser extension, a secret key, or another app when you want to personalize
       the experience.
     </p>
-  </article>
+  </div>
 
-  <article class="panel span-4 reveal" style="--index: 2;" use:reveal>
+  <div class="about-section">
     <h3>Posts and profiles keep looking good when they travel outside the app.</h3>
-    <p class="muted" style="margin: 0;">
+    <p class="muted">
       The first impression is a finished page, not a loading state waiting for context.
     </p>
-  </article>
-</section>
+  </div>
 
-<section class="section bento">
-  <article class="panel span-7 reveal" use:reveal>
-    <div class="panel-header">
-      <h2>Relay Press is built around a few simple reading habits.</h2>
-    </div>
+  <div class="about-section">
+    <h2>Relay Press is built around a few simple reading habits.</h2>
 
-    <div class="window">
-      <div class="window-chrome">
-        <span class="window-controls" aria-hidden="true">
-          <span class="window-dot"></span>
-          <span class="window-dot"></span>
-          <span class="window-dot"></span>
-        </span>
-        <span>Reading guide</span>
-        <kbd>3 patterns</kbd>
+    <div class="definition-list">
+      <div class="definition-row">
+        <span>Home</span>
+        <p>The front page surfaces recent long-form writing and makes it easy to keep browsing.</p>
       </div>
-
-      <div class="window-body">
-        <div class="definition-list">
-          <div class="definition-row">
-            <span>Home</span>
-            <p>The front page surfaces recent long-form writing and makes it easy to keep browsing.</p>
-          </div>
-          <div class="definition-row">
-            <span>Profiles</span>
-            <p>Author pages gather bios, links, and published stories in one place.</p>
-          </div>
-          <div class="definition-row">
-            <span>Posts</span>
-            <p>Every article and note gets a dedicated page that is easy to revisit and share.</p>
-          </div>
-          <div class="definition-row">
-            <span>Login</span>
-            <p>When you want to log in, you can use the account setup that already works for you.</p>
-          </div>
-        </div>
+      <div class="definition-row">
+        <span>Profiles</span>
+        <p>Author pages gather bios, links, and published stories in one place.</p>
+      </div>
+      <div class="definition-row">
+        <span>Posts</span>
+        <p>Every article and note gets a dedicated page that is easy to revisit and share.</p>
+      </div>
+      <div class="definition-row">
+        <span>Login</span>
+        <p>When you want to log in, you can use the account setup that already works for you.</p>
       </div>
     </div>
-  </article>
+  </div>
 
-  <article class="panel span-5 reveal" style="--index: 1;" use:reveal>
+  <div class="about-section">
     <h3>Use Relay Press when writing should feel linkable, legible, and easy to follow.</h3>
     <div class="definition-list">
       <div class="definition-row">
@@ -144,11 +121,9 @@
         <p>Who want a public reading surface that feels like a product instead of a test bench.</p>
       </div>
     </div>
-  </article>
-</section>
+  </div>
 
-<section class="section reveal" style="--index: 2;" use:reveal>
-  <article class="panel soft stack">
+  <div class="about-cta">
     <h2>Start reading, open a profile, or share a story.</h2>
     <p class="lede" style="margin: 0;">
       Relay Press keeps the experience focused on people and writing, not protocol trivia.
@@ -156,5 +131,31 @@
     <div class="actions">
       <a class="button" href="/">Browse stories</a>
     </div>
-  </article>
+  </div>
 </section>
+
+<style>
+  .about-container {
+    max-width: var(--content-width);
+    margin: 0 auto;
+    display: grid;
+    gap: 3rem;
+  }
+
+  .about-hero {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .about-section {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .about-cta {
+    display: grid;
+    gap: 1rem;
+    padding: 2rem 0;
+    border-top: 1px solid var(--border-light);
+  }
+</style>

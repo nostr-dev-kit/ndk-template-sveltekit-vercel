@@ -26,16 +26,10 @@
   <SeoHead {seo} />
 {/if}
 
-<div class="ambient-layer" aria-hidden="true"></div>
-
 <div class="topbar">
   <div class="shell topbar-inner">
     <a class="brand" href="/">
-      <span class="brand-mark">R</span>
-      <span class="brand-copy">
-        <span class="brand-name">Relay Press</span>
-        <span class="brand-note">Long-form writing on Nostr</span>
-      </span>
+      <span class="brand-name">Relay Press</span>
     </a>
 
     <SiteNavigation />
@@ -45,7 +39,7 @@
 </div>
 
 <main class="shell page">
-  {@render children()}
+  {@render children?.()}
 </main>
 
 <footer class="shell footer">
