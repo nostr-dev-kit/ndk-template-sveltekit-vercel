@@ -3,15 +3,16 @@
   import { browser } from '$app/environment';
   import { NDKEvent, type NostrEvent } from '@nostr-dev-kit/ndk';
   import StoryAuthor from '$lib/components/StoryAuthor.svelte';
+  import ArticleCard from '$lib/components/ArticleCard.svelte';
   import { ndk } from '$lib/ndk/client';
   import {
     articleImageUrl,
+    articleTitle,
     articlePublishedAt,
     articleReadTimeMinutes,
     articleSummary,
-    articleTitle,
-    formatDisplayDate,
-    noteExcerpt
+    noteExcerpt,
+    formatDisplayDate
   } from '$lib/ndk/format';
 
   let { data }: PageProps = $props();
@@ -149,31 +150,7 @@
     {#if feedArticles.length > 0}
       <section class="article-feed">
         {#each feedArticles as event (event.id)}
-          <a class="article-feed-item" href={`/note/${event.encode()}`}>
-            <div class="article-feed-copy">
-              <h3 class="article-feed-title">{articleTitle(event.rawEvent())}</h3>
-              <p class="article-feed-summary">{articleSummary(event.rawEvent(), 180)}</p>
-              <div class="article-feed-meta">
-                <StoryAuthor
-                  {ndk}
-                  pubkey={event.pubkey}
-                  avatarClass="article-author-avatar article-author-avatar-compact"
-                  compact
-                />
-                <span class="story-pub-meta">
-                  <span>{formatDisplayDate(articlePublishedAt(event.rawEvent()))}</span>
-                  <span>{articleReadTimeMinutes(event.content)} min read</span>
-                  {#if discussedComments.eventsTagging(event).length > 0}
-                    <span class="story-comment-count">{discussedComments.eventsTagging(event).length} comments</span>
-                  {/if}
-                </span>
-              </div>
-            </div>
-
-            {#if articleImageUrl(event.rawEvent())}
-              <img class="article-feed-thumb" src={articleImageUrl(event.rawEvent())} alt="" loading="lazy" />
-            {/if}
-          </a>
+          <ArticleCard {event} showAuthor />
         {/each}
       </section>
     {/if}
@@ -291,68 +268,6 @@
     display: grid;
   }
 
-  .article-feed-item {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 1.5rem;
-    align-items: start;
-    padding: 1.5rem 0;
-    border-bottom: 1px solid var(--border-light);
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .article-feed-item:first-child {
-    border-top: 1px solid var(--border-light);
-  }
-
-  .article-feed-copy {
-    display: grid;
-    gap: 0.5rem;
-  }
-
-  .article-feed-title {
-    margin: 0;
-    font-family: var(--font-serif);
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: var(--text-strong);
-    line-height: 1.2;
-    letter-spacing: -0.01em;
-    transition: color 160ms ease;
-  }
-
-  .article-feed-item:hover .article-feed-title {
-    color: var(--accent);
-  }
-
-  .article-feed-summary {
-    margin: 0;
-    color: var(--muted);
-    font-size: 0.95rem;
-    line-height: 1.5;
-    max-width: 48ch;
-  }
-
-  .article-feed-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem;
-    padding-top: 0.25rem;
-  }
-
-  .story-comment-count {
-    color: var(--accent);
-  }
-
-  .article-feed-thumb {
-    width: 8rem;
-    aspect-ratio: 4 / 3;
-    object-fit: cover;
-    border-radius: var(--radius-sm);
-  }
-
   /* sidebar */
 
   .home-sidebar {
@@ -436,15 +351,6 @@
   }
 
   @media (max-width: 720px) {
-    .article-feed-item {
-      grid-template-columns: 1fr;
-    }
-
-    .article-feed-thumb {
-      width: 100%;
-      aspect-ratio: 3 / 2;
-    }
-
     .featured-story-image {
       aspect-ratio: 3 / 2;
     }

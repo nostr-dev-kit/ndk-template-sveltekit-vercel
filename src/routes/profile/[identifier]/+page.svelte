@@ -6,16 +6,13 @@
   import { NDKEvent, type NostrEvent } from '@nostr-dev-kit/ndk';
   import { User } from '$lib/ndk/ui/user';
   import {
-    articleImageUrl,
     articlePublishedAt,
-    articleReadTimeMinutes,
-    articleSummary,
-    articleTitle,
     cleanText,
     displayNip05,
     displayName,
     formatDisplayDate
   } from '$lib/ndk/format';
+  import ArticleCard from '$lib/components/ArticleCard.svelte';
   import { ndk } from '$lib/ndk/client';
   import { safeUserPubkey } from '$lib/ndk/user';
 
@@ -98,20 +95,7 @@
   {#if articles.length > 0}
     <section class="article-feed profile-feed">
       {#each articles as event (event.id)}
-        <a class="article-feed-item" href={`/note/${event.encode()}`}>
-          <div class="article-feed-copy">
-            <h3 class="article-feed-title">{articleTitle(event.rawEvent())}</h3>
-            <p class="article-feed-summary">{articleSummary(event.rawEvent(), 220)}</p>
-            <span class="story-pub-meta">
-              <span>{formatDisplayDate(articlePublishedAt(event.rawEvent()))}</span>
-              <span>{articleReadTimeMinutes(event.content)} min read</span>
-            </span>
-          </div>
-
-          {#if articleImageUrl(event.rawEvent())}
-            <img class="article-feed-thumb" src={articleImageUrl(event.rawEvent())} alt="" loading="lazy" />
-          {/if}
-        </a>
+        <ArticleCard {event} />
       {/each}
     </section>
   {:else}
@@ -171,65 +155,5 @@
 
   .article-feed {
     display: grid;
-  }
-
-  .article-feed-item {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 1.5rem;
-    align-items: start;
-    padding: 1.5rem 0;
-    border-bottom: 1px solid var(--border-light);
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .article-feed-item:first-child {
-    border-top: 1px solid var(--border-light);
-  }
-
-  .article-feed-copy {
-    display: grid;
-    gap: 0.5rem;
-  }
-
-  .article-feed-title {
-    margin: 0;
-    font-family: var(--font-serif);
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: var(--text-strong);
-    line-height: 1.2;
-    transition: color 160ms ease;
-  }
-
-  .article-feed-item:hover .article-feed-title {
-    color: var(--accent);
-  }
-
-  .article-feed-summary {
-    margin: 0;
-    color: var(--muted);
-    font-size: 0.95rem;
-    line-height: 1.5;
-    max-width: 48ch;
-  }
-
-  .article-feed-thumb {
-    width: 8rem;
-    aspect-ratio: 4 / 3;
-    object-fit: cover;
-    border-radius: var(--radius-sm);
-  }
-
-  @media (max-width: 720px) {
-    .article-feed-item {
-      grid-template-columns: 1fr;
-    }
-
-    .article-feed-thumb {
-      width: 100%;
-      aspect-ratio: 3 / 2;
-    }
   }
 </style>
