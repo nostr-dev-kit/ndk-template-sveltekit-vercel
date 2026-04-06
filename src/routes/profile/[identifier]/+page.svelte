@@ -3,7 +3,7 @@
   import { page } from '$app/state';
   import { browser } from '$app/environment';
   import { createFetchUser } from '@nostr-dev-kit/svelte';
-  import { NDKEvent, type NostrEvent } from '@nostr-dev-kit/ndk';
+  import { NDKEvent, NDKKind, type NostrEvent } from '@nostr-dev-kit/ndk';
   import { User } from '$lib/ndk/ui/user';
   import {
     articlePublishedAt,
@@ -21,12 +21,39 @@
   const user = createFetchUser(ndk, () => routeIdentifier || data.npub || data.pubkey || '');
   const profile = $derived(user.profile ?? data.profile);
   const pubkey = $derived(data.pubkey || safeUserPubkey(user));
+  const isOwnProfile = $derived(Boolean(pubkey && ndk.$currentUser && ndk.$currentUser.pubkey === pubkey));
+
+  // ── NIP-F1 subscription ────────────────────────────────────────
+  const nipF1Sub = ndk.$subscribe(() => {
+    if (!browser || !pubkey) return undefined;
+    return {
+      filters: [{ kinds: [19999 as NDKKind], authors: [pubkey], limit: 1 }]
+    };
+  });
+
+  const nipF1Event = $derived(nipF1Sub.events[0] ?? null);
+  const nipF1Tags = $derived(nipF1Event?.tags ?? []);
+  const nipF1BgColor = $derived(nipF1Tags.find((t) => t[0] === 'background-color')?.[1] ?? '');
+  const nipF1FgColor = $derived(nipF1Tags.find((t) => t[0] === 'foreground-color')?.[1] ?? '');
+  const nipF1Music = $derived(nipF1Tags.find((t) => t[0] === 'background-music')?.[1] ?? '');
+  const nipF1PriorityKinds = $derived.by(() => {
+    const raw = nipF1Tags.find((t) => t[0] === 'priority_kinds')?.[1];
+    return raw ? raw.split(',').map(Number).filter((n) => !isNaN(n)) : [];
+  });
+  const nipF1CustomFields = $derived(
+    nipF1Tags
+      .filter((t) => t[0] === 'custom' && t[1] && t[2])
+      .map((t) => ({ key: t[1], value: t[2] }))
+  );
+
+  // ── articles subscription using priority kinds if set ──────────
+  const articleKinds = $derived(nipF1PriorityKinds.length > 0 ? nipF1PriorityKinds : [30023]);
 
   const liveArticles = ndk.$subscribe(() => {
     if (!browser || !pubkey) return undefined;
 
     return {
-      filters: [{ kinds: [30023], authors: [pubkey], limit: 12 }]
+      filters: [{ kinds: articleKinds, authors: [pubkey], limit: 12 }]
     };
   });
 
@@ -45,11 +72,28 @@
     return candidate;
   });
   const nip05 = $derived(displayNip05(profile));
+  const bannerUrl = $derived(cleanText(profile?.banner));
   const website = $derived(cleanText(typeof profile?.website === 'string' ? profile.website : ''));
   const storyCountLabel = $derived(`${articles.length} ${articles.length === 1 ? 'story' : 'stories'}`);
   const latestDateLabel = $derived(
     articles[0] ? formatDisplayDate(articlePublishedAt(articles[0].rawEvent())) : ''
   );
+
+  // ── music player state ─────────────────────────────────────────
+  let musicPlaying = $state(false);
+  let audioEl: HTMLAudioElement | null = $state(null);
+
+  function toggleMusic() {
+    if (!audioEl) return;
+    if (musicPlaying) {
+      audioEl.pause();
+      musicPlaying = false;
+    } else {
+      audioEl.muted = false;
+      void audioEl.play();
+      musicPlaying = true;
+    }
+  }
 
   function websiteLabel(url: string): string {
     try {
@@ -66,7 +110,17 @@
     <p class="muted" style="margin: 0;">Try a different profile link or come back in a moment.</p>
   </section>
 {:else}
-  <section class="profile-container">
+  <section
+    class="profile-container"
+    style:background-color={nipF1BgColor || undefined}
+    style:color={nipF1FgColor || undefined}
+  >
+    {#if bannerUrl}
+      <div class="profile-banner">
+        <img src={bannerUrl} alt="" class="profile-banner-img" />
+      </div>
+    {/if}
+
     <div class="profile-header">
       <User.Root {ndk} pubkey={pubkey} profile={profile}>
         <User.Avatar class="profile-avatar author-avatar-centered" />
@@ -89,6 +143,48 @@
           </a>
         {/if}
       </div>
+
+      {#if nipF1CustomFields.length > 0}
+        <div class="definition-list profile-custom-fields">
+          {#each nipF1CustomFields as field (field.key)}
+            <div class="definition-row">
+              <span>{field.key}</span>
+              <p>{field.value}</p>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      {#if nipF1Music}
+        <div class="profile-music">
+          <audio bind:this={audioEl} src={nipF1Music} loop muted></audio>
+          <button class="profile-music-btn" type="button" onclick={toggleMusic}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              {#if musicPlaying}
+                <rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
+              {:else}
+                <polygon points="5 3 19 12 5 21 5 3" />
+              {/if}
+            </svg>
+            {musicPlaying ? 'Pause music' : 'Play music'}
+          </button>
+        </div>
+      {/if}
+
+      <div class="profile-actions">
+        {#if pubkey && ndk.$currentUser && ndk.$currentUser.pubkey !== pubkey}
+          <button
+            class="follow-btn"
+            class:following={ndk.$follows.has(pubkey)}
+            onclick={() => ndk.$follows.has(pubkey) ? ndk.$follows.remove(pubkey) : ndk.$follows.add(pubkey)}
+          >
+            {ndk.$follows.has(pubkey) ? 'Following' : 'Follow'}
+          </button>
+        {/if}
+        {#if isOwnProfile}
+          <a href="/profile/edit" class="button-secondary profile-edit-btn">Edit profile</a>
+        {/if}
+      </div>
     </div>
   </section>
 
@@ -109,6 +205,21 @@
   .profile-container {
     max-width: var(--content-width);
     margin: 0 auto;
+    border-radius: var(--radius-md);
+    padding: 0 0 1rem;
+  }
+
+  .profile-banner {
+    width: 100%;
+    aspect-ratio: 3 / 1;
+    overflow: hidden;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+  }
+
+  .profile-banner-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .profile-header {
@@ -116,7 +227,7 @@
     justify-items: center;
     gap: 0.75rem;
     text-align: center;
-    padding-bottom: 1.5rem;
+    padding: 0 1rem 1.5rem;
   }
 
   :global(.author-avatar-centered) {
@@ -127,7 +238,7 @@
 
   .profile-bio {
     margin: 0;
-    color: var(--text);
+    color: inherit;
     font-size: 1.02rem;
     max-width: 48ch;
   }
@@ -140,12 +251,80 @@
     font-size: 0.85rem;
   }
 
+  .profile-custom-fields {
+    width: 100%;
+    max-width: 24rem;
+  }
+
+  .profile-music {
+    display: flex;
+    justify-content: center;
+  }
+
+  .profile-music-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    background: var(--surface-soft);
+    color: var(--muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: color 120ms, border-color 120ms;
+  }
+
+  .profile-music-btn:hover {
+    color: var(--text-strong);
+    border-color: var(--text);
+  }
+
+  .profile-music-btn svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .profile-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .profile-edit-btn {
+    font-size: 0.88rem;
+    text-decoration: none;
+  }
+
   .profile-website-link {
     color: var(--accent);
   }
 
   .profile-website-link:hover {
     color: var(--accent-hover);
+  }
+
+  .follow-btn {
+    padding: 0.4rem 1.2rem;
+    border-radius: 999px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .follow-btn.following {
+    background: transparent;
+    color: var(--accent);
+  }
+
+  .follow-btn:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: white;
   }
 
   .profile-feed {

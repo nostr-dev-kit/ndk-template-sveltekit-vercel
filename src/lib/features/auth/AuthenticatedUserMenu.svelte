@@ -29,6 +29,10 @@
     void goto(profileHref);
   }
 
+  function navigateToEditProfile() {
+    void goto('/profile/edit');
+  }
+
   function navigateToOnboarding() {
     void goto('/onboarding');
   }
@@ -82,6 +86,16 @@
           />
         </svg>
         <span>Profile</span>
+      </DropdownMenu.Item>
+
+      <DropdownMenu.Item onSelect={navigateToEditProfile}>
+        <svg class="auth-menu-item-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M16.474 5.408l2.118 2.118m-.756-3.982L12.109 9.27a2.118 2.118 0 0 0-.58 1.082l-.634 2.92 2.92-.634a2.118 2.118 0 0 0 1.082-.58l5.727-5.727a1.853 1.853 0 1 0-2.621-2.621Z"
+          />
+          <path d="M19 15v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h3" />
+        </svg>
+        <span>Edit profile</span>
       </DropdownMenu.Item>
 
       {#if shouldFinishOnboarding}
