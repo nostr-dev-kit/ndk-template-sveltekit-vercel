@@ -4,6 +4,7 @@
   import type { LayoutProps } from './$types';
   import '../app.css';
   import LoginPanel from '$lib/components/LoginPanel.svelte';
+  import SiteNavigation from '$lib/components/SiteNavigation.svelte';
   import SeoHead from '$lib/components/SeoHead.svelte';
   import { ndk, ensureClientNdk } from '$lib/ndk/client';
   import type { SeoMetadata } from '$lib/seo';
@@ -37,10 +38,7 @@
       </span>
     </a>
 
-    <div class="nav-links">
-      <a href="/">Read</a>
-      <a href="/about">About</a>
-    </div>
+    <SiteNavigation />
 
     <LoginPanel />
   </div>

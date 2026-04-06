@@ -14,6 +14,7 @@
   let pending = $state(false);
   let preparingRemoteSigner = $state(false);
   let connectingBunker = $state(false);
+  let loginIntent = $state<'login' | 'join'>('login');
   let privateKey = $state('');
   let bunkerUri = $state('');
   let qrCodeDataUrl = $state('');
@@ -51,6 +52,7 @@
       error = '';
       pending = false;
       privateKey = '';
+      loginIntent = 'login';
       resetRemoteSigner();
     }
   });
@@ -61,6 +63,24 @@
     }
   });
 
+  async function finishLogin() {
+    const shouldRouteToOnboarding = loginIntent === 'join';
+    open = false;
+
+    if (shouldRouteToOnboarding) {
+      await goto('/onboarding');
+    }
+  }
+
+  function startJoin() {
+    loginIntent = 'join';
+    open = true;
+  }
+
+  function startLogin() {
+    loginIntent = 'login';
+  }
+
   async function loginWithExtension() {
     if (!ndk.$sessions || pending || !hasExtension) return;
 
@@ -68,7 +88,7 @@
       pending = true;
       error = '';
       await ndk.$sessions.login(new NDKNip07Signer());
-      open = false;
+      await finishLogin();
     } catch (caught) {
       error = caught instanceof Error ? caught.message : "Couldn't log in with the extension.";
     } finally {
@@ -83,7 +103,7 @@
       pending = true;
       error = '';
       await ndk.$sessions.login(new NDKPrivateKeySigner(privateKey.trim()));
-      open = false;
+      await finishLogin();
     } catch (caught) {
       error = caught instanceof Error ? caught.message : "Couldn't log in with that key.";
     } finally {
@@ -126,7 +146,7 @@
           if (nostrConnectSigner !== signer || !ndk.$sessions) return;
 
           await ndk.$sessions.login(signer);
-          open = false;
+          await finishLogin();
         })
         .catch((caught) => {
           if (nostrConnectSigner !== signer) return;
@@ -154,7 +174,7 @@
 
       const signer = new NDKNip46Signer(ndk, bunkerUri.trim());
       await ndk.$sessions.login(signer);
-      open = false;
+      await finishLogin();
     } catch (caught) {
       error = caught instanceof Error ? caught.message : "Couldn't use that connection link.";
     } finally {
@@ -184,7 +204,10 @@
 {:else}
   <div class="login-shell">
     <Dialog.Root bind:open>
-      <Dialog.Trigger class="button-secondary login-trigger">Log in</Dialog.Trigger>
+      <div class="topbar-guest-actions">
+        <button class="button login-join" type="button" onclick={startJoin}>Join</button>
+        <Dialog.Trigger class="button-secondary login-trigger" onclick={startLogin}>Log in</Dialog.Trigger>
+      </div>
 
       <Dialog.Content class="login-dialog">
         <div class="login-dialog-chrome">

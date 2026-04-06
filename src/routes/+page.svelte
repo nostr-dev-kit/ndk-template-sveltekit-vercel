@@ -6,10 +6,12 @@
   import { reveal } from '$lib/actions/reveal';
   import { ndk } from '$lib/ndk/client';
   import {
+    articleImageUrl,
     articlePublishedAt,
     articleReadTimeMinutes,
     articleSummary,
     articleTitle,
+    articleTopics,
     formatDisplayDate
   } from '$lib/ndk/format';
 
@@ -35,10 +37,29 @@
   const seedArticles = $derived((data.articles ?? []).map((event: NostrEvent) => new NDKEvent(ndk, event)));
   const liveArticles = $derived(mergeUniqueArticles(discussedArticles.events, recentArticles.events, 12));
   const articles = $derived(liveArticles.length > 0 ? liveArticles : seedArticles);
-  const featuredArticle = $derived(articles[0]);
-  const railArticles = $derived(featuredArticle ? articles.slice(1, 5) : articles.slice(0, 4));
-  const latestArticles = $derived(featuredArticle ? articles.slice(5, 9) : articles.slice(4, 8));
-  const archiveArticles = $derived(featuredArticle ? articles.slice(9, 12) : articles.slice(8, 11));
+  const featuredArticle = $derived.by(() =>
+    articles.find((event) => Boolean(articleImageUrl(event.rawEvent())))
+  );
+  const featuredImage = $derived(featuredArticle ? articleImageUrl(featuredArticle.rawEvent()) : undefined);
+  const featuredTopics = $derived(
+    featuredArticle ? articleTopics(featuredArticle.rawEvent(), 2) : []
+  );
+  const nonFeaturedArticles = $derived.by(() => {
+    const featuredId = featuredArticle?.tagId();
+    if (!featuredId) return articles;
+
+    return articles.filter((event) => event.tagId() !== featuredId);
+  });
+  const railArticles = $derived(nonFeaturedArticles.slice(0, 4));
+  const latestArticles = $derived(nonFeaturedArticles.slice(4, 8));
+  const archiveArticles = $derived(nonFeaturedArticles.slice(8, 11));
+
+  let featuredImageLoaded = $state(false);
+
+  $effect(() => {
+    featuredImage;
+    featuredImageLoaded = false;
+  });
 
   function mergeUniqueArticles(primary: NDKEvent[], secondary: NDKEvent[], limit: number): NDKEvent[] {
     const merged: NDKEvent[] = [];
@@ -61,22 +82,51 @@
 </script>
 
 <section class="lead-grid section">
-  {#if featuredArticle}
+  {#if featuredArticle && featuredImage}
     <a class="panel story-link-card lead-story reveal" href={`/note/${featuredArticle.encode()}`} use:reveal>
-      <h1>{articleTitle(featuredArticle.rawEvent())}</h1>
-      <p class="lead-deck">{articleSummary(featuredArticle.rawEvent(), 360)}</p>
+      <div class="lead-story-media">
+        <img
+          class:loaded={featuredImageLoaded}
+          class="lead-story-image"
+          src={featuredImage}
+          alt={articleTitle(featuredArticle.rawEvent())}
+          loading="eager"
+          decoding="async"
+          fetchpriority="high"
+          onload={() => (featuredImageLoaded = true)}
+        />
+        <div class="lead-story-media-glow"></div>
 
-      <div class="story-byline">
-        <StoryAuthor {ndk} pubkey={featuredArticle.pubkey} avatarClass="article-author-avatar" />
+        <div class="lead-story-badges">
+          <span class="eyebrow eyebrow-blue">Featured</span>
+          {#each featuredTopics as topic}
+            <span class="lead-story-topic">{topic}</span>
+          {/each}
+        </div>
+      </div>
 
-        <div class="story-pub-meta">
-          <span>{formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent()))}</span>
-          <span>{articleReadTimeMinutes(featuredArticle.content)} min read</span>
+      <div class="lead-story-copy">
+        <h1>{articleTitle(featuredArticle.rawEvent())}</h1>
+        <p class="lead-deck">{articleSummary(featuredArticle.rawEvent(), 360)}</p>
+
+        <div class="story-byline">
+          <StoryAuthor {ndk} pubkey={featuredArticle.pubkey} avatarClass="article-author-avatar" />
+
+          <div class="story-pub-meta">
+            <span>{formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent()))}</span>
+            <span>{articleReadTimeMinutes(featuredArticle.content)} min read</span>
+          </div>
         </div>
       </div>
     </a>
+  {:else if articles.length > 0}
+    <article class="panel lead-story lead-story-empty reveal" use:reveal>
+      <span class="eyebrow eyebrow-yellow">Featured slot</span>
+      <h1>No featured story yet.</h1>
+      <p class="lead-deck">The lead story appears once an article ships with a tagged image.</p>
+    </article>
   {:else}
-    <article class="panel lead-story reveal" use:reveal>
+    <article class="panel lead-story lead-story-empty reveal" use:reveal>
       <h1>Waiting for the first story.</h1>
       <p class="lead-deck">New writing will appear here as soon as stories are available.</p>
     </article>
