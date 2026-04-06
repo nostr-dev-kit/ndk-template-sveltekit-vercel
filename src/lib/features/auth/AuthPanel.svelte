@@ -3,8 +3,9 @@
   import { goto } from '$app/navigation';
   import { NDKKind, type NDKEvent, type NDKUserProfile } from '@nostr-dev-kit/ndk';
   import { ndk } from '$lib/ndk/client';
+  import AuthenticatedUserMenu from './AuthenticatedUserMenu.svelte';
   import LoginDialog from './LoginDialog.svelte';
-  import { authProfileHref, authUserLabel, fetchResolvedProfile, needsOnboarding } from './auth';
+  import { authProfileHref, fetchResolvedProfile, needsOnboarding } from './auth';
 
   let resolvedProfile: NDKUserProfile | undefined = $state();
   let loadingProfile = $state(false);
@@ -13,7 +14,6 @@
   const currentProfile = $derived(resolvedProfile ?? currentUser?.profile ?? undefined);
   const interestEvent = $derived(ndk.$sessions?.getSessionEvent(NDKKind.InterestList));
   const isReadOnly = $derived(Boolean(ndk.$sessions?.isReadOnly()));
-  const currentUserLabel = $derived(authUserLabel(currentProfile));
   const shouldFinishOnboarding = $derived(
     needsOnboarding({
       user: currentUser,
@@ -62,16 +62,13 @@
 </script>
 
 {#if currentUser}
-  <div class="auth-panel">
-    <div class="auth-actions">
-      <span class="muted auth-user-label">{currentUserLabel}</span>
-      {#if shouldFinishOnboarding}
-        <a class="button-secondary" href="/onboarding">Finish setup</a>
-      {/if}
-      <a class="button-secondary" href={currentProfileHref}>Profile</a>
-      <button class="button-secondary" type="button" onclick={logout}>Log out</button>
-    </div>
-  </div>
+  <AuthenticatedUserMenu
+    user={currentUser}
+    profile={currentProfile}
+    profileHref={currentProfileHref}
+    {shouldFinishOnboarding}
+    onLogout={logout}
+  />
 {:else}
   <LoginDialog />
 {/if}

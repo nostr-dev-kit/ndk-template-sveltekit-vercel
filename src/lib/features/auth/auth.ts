@@ -7,7 +7,7 @@ import {
 } from '@nostr-dev-kit/ndk';
 import QRCode from 'qrcode';
 import { APP_NAME } from '$lib/ndk/config';
-import { cleanText, displayName, profileIdentifier } from '$lib/ndk/format';
+import { avatarUrl, cleanText, displayName, displayNip05, profileIdentifier } from '$lib/ndk/format';
 import { interestTagsFromEvent, onboardingComplete } from '$lib/onboarding';
 
 const NOSTR_CONNECT_RELAY = 'wss://relay.nsec.app';
@@ -63,7 +63,38 @@ export async function fetchResolvedProfile(user: NDKUser): Promise<NDKUserProfil
 }
 
 export function authUserLabel(profile: NDKUserProfile | undefined): string {
-  return displayName(profile, '') || cleanText(profile?.nip05) || 'Signed in';
+  return displayName(profile, '') || displayNip05(profile) || 'Account';
+}
+
+export function authUserMeta(profile: NDKUserProfile | undefined, npub: string): string {
+  const nip05 = displayNip05(profile);
+  if (nip05 && nip05 !== authUserLabel(profile)) {
+    return nip05;
+  }
+
+  return npub.length > 16 ? `${npub.slice(0, 8)}...${npub.slice(-6)}` : npub || 'Nostr account';
+}
+
+export function authUserInitials(profile: NDKUserProfile | undefined): string {
+  const rawName =
+    cleanText(profile?.displayName) ||
+    cleanText(profile?.name) ||
+    displayNip05(profile) ||
+    'Nostr User';
+
+  const parts = rawName
+    .split(/[\s._-]+/)
+    .map((part) => cleanText(part))
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (parts.length === 0) return 'NU';
+
+  return parts.map((part) => part[0]?.toUpperCase() ?? '').join('').slice(0, 2) || 'NU';
+}
+
+export function authUserAvatar(profile: NDKUserProfile | undefined): string | undefined {
+  return avatarUrl(profile);
 }
 
 export function authProfileHref(profile: NDKUserProfile | undefined, npub: string): string {
