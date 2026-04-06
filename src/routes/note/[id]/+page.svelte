@@ -27,6 +27,7 @@
   import '$lib/ndk/components/embedded-article';
   import EventAuthorHeader from '$lib/components/EventAuthorHeader.svelte';
   import BookmarkIcon from '$lib/components/BookmarkIcon.svelte';
+  import HighlightPopover from '$lib/components/HighlightPopover.svelte';
   import { mergeUniqueEvents } from '$lib/ndk/events';
 
   let { data }: PageProps = $props();
@@ -35,6 +36,7 @@
   let replyText = $state('');
   let submitting = $state(false);
   let bookmarking = $state(false);
+  let articleContentEl = $state<HTMLElement | null>(null);
 
   const currentUser = $derived(ndk.$currentUser);
 
@@ -344,7 +346,10 @@
           </Tabs.List>
 
           <Tabs.Content value="article" class="article-tab-panel">
-            <ArticleMarkdown content={event.content} tags={event.tags} />
+            <div bind:this={articleContentEl}>
+              <ArticleMarkdown content={event.content} tags={event.tags} highlights={highlightEvents} />
+            </div>
+            <HighlightPopover articleEvent={event} containerEl={articleContentEl} />
           </Tabs.Content>
 
           <Tabs.Content value="comments" class="article-tab-panel">

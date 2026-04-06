@@ -1,20 +1,76 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { ndk } from '$lib/ndk/client';
   import { MarkdownEventContent } from '$lib/ndk/ui/markdown-event-content';
   import '$lib/ndk/components/mention';
   import '$lib/ndk/components/embedded-note';
   import '$lib/ndk/components/embedded-article';
+  import type { NDKEvent } from '@nostr-dev-kit/ndk';
 
   interface Props {
     content: string;
     tags?: string[][];
+    highlights?: NDKEvent[];
     class?: string;
   }
 
-  let { content, tags = [], class: className = '' }: Props = $props();
+  let { content, tags = [], highlights = [], class: className = '' }: Props = $props();
+  let containerEl = $state<HTMLElement | null>(null);
+
+  function markHighlightsInDom(container: HTMLElement, texts: string[]) {
+    if (!texts.length || !container) return;
+
+    // Remove previous marks
+    container.querySelectorAll('mark.inline-highlight').forEach((mark) => {
+      const parent = mark.parentNode;
+      if (parent) {
+        parent.replaceChild(document.createTextNode(mark.textContent ?? ''), mark);
+        parent.normalize();
+      }
+    });
+
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    const textNodes: Text[] = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode as Text);
+
+    for (const highlightText of texts) {
+      if (!highlightText || highlightText.length < 8) continue;
+
+      for (const textNode of textNodes) {
+        const nodeText = textNode.textContent ?? '';
+        const idx = nodeText.indexOf(highlightText);
+        if (idx === -1) continue;
+
+        const before = nodeText.slice(0, idx);
+        const after = nodeText.slice(idx + highlightText.length);
+
+        const mark = document.createElement('mark');
+        mark.className = 'inline-highlight';
+        mark.textContent = highlightText;
+
+        const parent = textNode.parentNode!;
+        if (before) parent.insertBefore(document.createTextNode(before), textNode);
+        parent.insertBefore(mark, textNode);
+        if (after) parent.insertBefore(document.createTextNode(after), textNode);
+        parent.removeChild(textNode);
+        break; // one match per highlight text
+      }
+    }
+  }
+
+  $effect(() => {
+    // Track dependencies
+    const texts = highlights.map((h) => h.content).filter(Boolean);
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    content;
+    if (!containerEl) return;
+    tick().then(() => {
+      markHighlightsInDom(containerEl!, texts);
+    });
+  });
 </script>
 
-<div class={`article-markdown ${className}`}>
+<div class={`article-markdown ${className}`} bind:this={containerEl}>
   <MarkdownEventContent {ndk} {content} emojiTags={tags} class="article-markdown__content" />
 </div>
 
