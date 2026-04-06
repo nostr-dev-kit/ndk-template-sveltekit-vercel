@@ -3,7 +3,7 @@
   import { onMount, setContext } from 'svelte';
   import type { LayoutProps } from './$types';
   import '../app.css';
-  import LoginPanel from '$lib/components/LoginPanel.svelte';
+  import AuthPanel from '$lib/features/auth/AuthPanel.svelte';
   import SiteNavigation from '$lib/components/SiteNavigation.svelte';
   import SeoHead from '$lib/components/SeoHead.svelte';
   import { ndk, ensureClientNdk } from '$lib/ndk/client';
@@ -40,7 +40,7 @@
 
     <SiteNavigation />
 
-    <LoginPanel />
+    <AuthPanel />
   </div>
 </div>
 
