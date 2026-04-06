@@ -21,6 +21,7 @@
     profileIdentifier
   } from '$lib/ndk/format';
   import { ndk } from '$lib/ndk/client';
+  import { safeUserIdentifier } from '$lib/ndk/user';
 
   let { data }: PageProps = $props();
   let activeTab = $state<'article' | 'comments' | 'highlights'>('article');
@@ -37,7 +38,11 @@
   const author = createFetchUser(ndk, () => authorPubkey || data.authorNpub || '');
   const authorProfile = $derived(author.profile ?? data.profile);
   const authorLinkIdentifier = $derived(
-    profileIdentifier(authorProfile, author.npub || data.authorNpub || authorPubkey || 'author')
+    profileIdentifier(
+      authorProfile,
+      data.authorIdentifier ||
+        safeUserIdentifier(author, data.authorNpub || authorPubkey || 'author')
+    )
   );
   const seedComments = $derived(
     (data.comments ?? []).map((comment: NostrEvent) => new NDKEvent(ndk, comment))

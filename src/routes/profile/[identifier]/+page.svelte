@@ -19,12 +19,13 @@
     formatDisplayDate
   } from '$lib/ndk/format';
   import { ndk } from '$lib/ndk/client';
+  import { safeUserPubkey } from '$lib/ndk/user';
 
   let { data }: PageProps = $props();
   const routeIdentifier = $derived(page.params.identifier || data.identifier || '');
   const user = createFetchUser(ndk, () => routeIdentifier || data.npub || data.pubkey || '');
   const profile = $derived(user.profile ?? data.profile);
-  const pubkey = $derived(user.pubkey ?? data.pubkey ?? '');
+  const pubkey = $derived(data.pubkey || safeUserPubkey(user));
 
   const liveArticles = ndk.$subscribe(() => {
     if (!browser || !pubkey) return undefined;
