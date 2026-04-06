@@ -29,7 +29,7 @@
 <div class="topbar">
   <div class="shell topbar-inner">
     <a class="brand" href="/">
-      <span class="brand-name">Relay Press</span>
+      <span class="brand-name">Highlighter</span>
     </a>
 
     <SiteNavigation />
@@ -45,6 +45,6 @@
 <footer class="shell footer">
   <div class="footer-grid">
     <span>Read essays, dispatches, and notes from Nostr.</span>
-    <span><a href="/about">About Relay Press</a></span>
+    <span><a href="/about">About Highlighter</a></span>
   </div>
 </footer>

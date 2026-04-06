@@ -128,7 +128,7 @@
 </script>
 
 <svelte:head>
-  <title>Bookmarks — Relay Press</title>
+  <title>Bookmarks — Highlighter</title>
 </svelte:head>
 
 <div class="bookmarks-layout">

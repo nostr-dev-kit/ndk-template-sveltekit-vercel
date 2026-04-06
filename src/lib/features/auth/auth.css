@@ -113,9 +113,20 @@
   transform: translateY(1px);
 }
 
-.auth-user-chevron path,
-.auth-menu-item-icon path {
-  fill: currentColor;
+.auth-user-chevron {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.auth-menu-item-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .auth-user-menu-content {

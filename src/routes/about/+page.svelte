@@ -5,7 +5,7 @@
   <div class="about-hero">
     <h1>A calmer way to read and share long-form writing from Nostr.</h1>
     <p class="lede">
-      Relay Press turns posts into clean, readable pages that are easy to share, revisit, and pass
+      Highlighter turns posts into clean, readable pages that are easy to share, revisit, and pass
       around. Stories open as proper articles, writer pages gather someone's work in one place, and
       links carry a useful preview when they travel.
     </p>
@@ -21,7 +21,7 @@
   <div class="about-section">
     <h2>Writing deserves pages that feel finished.</h2>
     <p class="muted">
-      A good reading app should disappear behind the work. Relay Press keeps the focus on the
+      A good reading app should disappear behind the work. Highlighter keeps the focus on the
       story, the author, and the link you can send to someone else.
     </p>
 
@@ -62,7 +62,7 @@
   <div class="about-section">
     <h3>Clear hierarchy, generous spacing, and room for the writing to breathe.</h3>
     <p class="muted">
-      Relay Press avoids pushing readers into raw identifiers, implementation details, or cluttered
+      Highlighter avoids pushing readers into raw identifiers, implementation details, or cluttered
       layouts.
     </p>
   </div>
@@ -83,7 +83,7 @@
   </div>
 
   <div class="about-section">
-    <h2>Relay Press is built around a few simple reading habits.</h2>
+    <h2>Highlighter is built around a few simple reading habits.</h2>
 
     <div class="definition-list">
       <div class="definition-row">
@@ -106,7 +106,7 @@
   </div>
 
   <div class="about-section">
-    <h3>Use Relay Press when writing should feel linkable, legible, and easy to follow.</h3>
+    <h3>Use Highlighter when writing should feel linkable, legible, and easy to follow.</h3>
     <div class="definition-list">
       <div class="definition-row">
         <span>Readers</span>
@@ -126,7 +126,7 @@
   <div class="about-cta">
     <h2>Start reading, open a profile, or share a story.</h2>
     <p class="lede" style="margin: 0;">
-      Relay Press keeps the experience focused on people and writing, not protocol trivia.
+      Highlighter keeps the experience focused on people and writing, not protocol trivia.
     </p>
     <div class="actions">
       <a class="button" href="/">Browse stories</a>

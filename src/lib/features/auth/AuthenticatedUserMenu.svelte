@@ -81,19 +81,14 @@
 
       <DropdownMenu.Item onSelect={navigateToProfile}>
         <svg class="auth-menu-item-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-3.314 0-6 1.79-6 4v1h12v-1c0-2.21-2.686-4-6-4Z"
-          />
+          <path d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
         </svg>
         <span>Profile</span>
       </DropdownMenu.Item>
 
       <DropdownMenu.Item onSelect={navigateToEditProfile}>
         <svg class="auth-menu-item-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M16.474 5.408l2.118 2.118m-.756-3.982L12.109 9.27a2.118 2.118 0 0 0-.58 1.082l-.634 2.92 2.92-.634a2.118 2.118 0 0 0 1.082-.58l5.727-5.727a1.853 1.853 0 1 0-2.621-2.621Z"
-          />
-          <path d="M19 15v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h3" />
+          <path d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
         </svg>
         <span>Edit profile</span>
       </DropdownMenu.Item>
@@ -101,9 +96,7 @@
       {#if shouldFinishOnboarding}
         <DropdownMenu.Item onSelect={navigateToOnboarding}>
           <svg class="auth-menu-item-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm-1.1 14.3L7.6 13l1.4-1.4 1.9 1.9 4.8-4.8 1.4 1.4Z"
-            />
+            <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
           </svg>
           <span>Finish setup</span>
         </DropdownMenu.Item>
@@ -111,9 +104,7 @@
 
       <DropdownMenu.Item class="auth-menu-item-danger" onSelect={handleLogout}>
         <svg class="auth-menu-item-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path
-            d="M10 17v-2h4V9h-4V7h7v10Zm-1.4 2L3.3 13.7a2 2 0 0 1 0-2.8L8.6 5.6 10 7l-4.2 4.2a1 1 0 0 0 0 1.4L10 16.8Z"
-          />
+          <path d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15m-3 0-3-3m0 0 3-3m-3 3H15" />
         </svg>
         <span>Log out</span>
       </DropdownMenu.Item>

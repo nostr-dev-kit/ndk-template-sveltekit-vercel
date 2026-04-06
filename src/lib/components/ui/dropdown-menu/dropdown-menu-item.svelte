@@ -20,19 +20,19 @@
 <style>
   :global(.dropdown-menu-item) {
     display: flex;
-    width: calc(100% - 0.75rem);
-    margin: 0.2rem 0.375rem;
+    width: calc(100% - 0.7rem);
+    margin: 0.1rem 0.35rem;
     align-items: center;
-    gap: 0.75rem;
-    border-radius: 0.85rem;
-    padding: 0.75rem 0.85rem;
-    color: var(--text-strong);
+    gap: 0.65rem;
+    border-radius: 0.7rem;
+    padding: 0.6rem 0.8rem;
+    color: var(--text);
+    font-size: 0.9rem;
     cursor: pointer;
     user-select: none;
     transition:
       background-color 160ms ease,
-      color 160ms ease,
-      transform 160ms ease;
+      color 160ms ease;
   }
 
   :global(.dropdown-menu-item-inset) {
@@ -40,9 +40,8 @@
   }
 
   :global(.dropdown-menu-item[data-highlighted]) {
-    background: rgba(251, 243, 219, 0.9);
+    background: rgba(17, 17, 17, 0.05);
     color: var(--text-strong);
-    transform: translateX(2px);
     outline: none;
   }
 
