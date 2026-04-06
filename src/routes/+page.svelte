@@ -117,8 +117,19 @@
 <section class="lead-grid section">
   {#if featuredArticle && featuredImage}
     <a class="panel story-link-card lead-story reveal" href={`/note/${featuredArticle.encode()}`} use:reveal>
-      <div class="lead-story-copy">
-        <div class="lead-story-card">
+      <div class="lead-story-media">
+        <img
+          class:loaded={featuredImageLoaded}
+          class="lead-story-image"
+          src={featuredImage}
+          alt={articleTitle(featuredArticle.rawEvent())}
+          loading="eager"
+          decoding="async"
+          fetchpriority="high"
+          onload={() => (featuredImageLoaded = true)}
+        />
+
+        <div class="lead-story-copy">
           <div class="lead-story-badges">
             {#each featuredTopics as topic (topic)}
               <span class="lead-story-topic">{topic}</span>
@@ -139,19 +150,6 @@
             <StoryAuthor {ndk} pubkey={featuredArticle.pubkey} avatarClass="article-author-avatar" />
           </div>
         </div>
-      </div>
-
-      <div class="lead-story-media">
-        <img
-          class:loaded={featuredImageLoaded}
-          class="lead-story-image"
-          src={featuredImage}
-          alt={articleTitle(featuredArticle.rawEvent())}
-          loading="eager"
-          decoding="async"
-          fetchpriority="high"
-          onload={() => (featuredImageLoaded = true)}
-        />
       </div>
     </a>
   {:else if articles.length > 0}
