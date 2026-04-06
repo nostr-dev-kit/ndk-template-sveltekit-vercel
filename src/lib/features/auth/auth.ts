@@ -12,7 +12,6 @@ import { interestTagsFromEvent, onboardingComplete } from '$lib/onboarding';
 
 const NOSTR_CONNECT_RELAY = 'wss://relay.primal.net';
 
-export type LoginIntent = 'login' | 'join';
 export type LoginMode = 'extension' | 'private-key' | 'remote';
 
 type NostrConnectNdk = Parameters<typeof NDKNip46Signer.nostrconnect>[0];

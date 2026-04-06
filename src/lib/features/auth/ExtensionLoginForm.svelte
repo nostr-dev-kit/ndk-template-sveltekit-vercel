@@ -10,9 +10,6 @@
 
 <div class="stack">
   <p class="muted" style="margin: 0;">Use a browser extension you already trust.</p>
-  <div class={`status-pill ${hasExtension ? 'status-green' : 'status-yellow'}`}>
-    {hasExtension ? 'Extension ready' : 'Extension not found'}
-  </div>
   <button
     class="button auth-action"
     type="button"

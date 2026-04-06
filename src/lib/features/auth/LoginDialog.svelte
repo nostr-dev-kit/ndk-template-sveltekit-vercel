@@ -12,13 +12,11 @@
     hasNostrExtension,
     prepareRemoteSignerPairing,
     stopNostrConnectSigner,
-    type LoginIntent,
     type LoginMode
   } from './auth';
 
   let open = $state(false);
   let mode = $state<LoginMode>('extension');
-  let loginIntent = $state<LoginIntent>('login');
   let pending = $state(false);
   let preparingRemoteSigner = $state(false);
   let connectingBunker = $state(false);
@@ -45,7 +43,6 @@
     error = '';
     pending = false;
     privateKey = '';
-    loginIntent = 'login';
     mode = 'extension';
     preparingRemoteSigner = false;
     clearRemoteSigner();
@@ -64,22 +61,12 @@
     }
   });
 
-  async function finishLogin() {
-    const shouldRouteToOnboarding = loginIntent === 'join';
+  function finishLogin() {
     open = false;
-
-    if (shouldRouteToOnboarding) {
-      await goto('/onboarding');
-    }
   }
 
   function startJoin() {
-    loginIntent = 'join';
-    open = true;
-  }
-
-  function startLogin() {
-    loginIntent = 'login';
+    void goto('/onboarding');
   }
 
   async function loginWithExtension() {
@@ -89,7 +76,7 @@
       pending = true;
       error = '';
       await ndk.$sessions.login(new NDKNip07Signer());
-      await finishLogin();
+      finishLogin();
     } catch (caught) {
       error = caught instanceof Error ? caught.message : "Couldn't log in with the extension.";
     } finally {
@@ -104,7 +91,7 @@
       pending = true;
       error = '';
       await ndk.$sessions.login(new NDKPrivateKeySigner(privateKey.trim()));
-      await finishLogin();
+      finishLogin();
     } catch (caught) {
       error = caught instanceof Error ? caught.message : "Couldn't log in with that key.";
     } finally {
@@ -133,7 +120,7 @@
           finishLogin();
         })
         .catch((caught) => {
-          if (nostrConnectSigner !== pairing.signer) return;
+          if (nostrConnectSigner !== activeSigner) return;
           error = caught instanceof Error ? caught.message : "Couldn't finish connecting to that app.";
         });
     } catch (caught) {
@@ -153,7 +140,7 @@
       stopNostrConnectSigner(nostrConnectSigner);
       nostrConnectSigner = null;
       await ndk.$sessions.login(new NDKNip46Signer(ndk, bunkerUri.trim()));
-      await finishLogin();
+      finishLogin();
     } catch (caught) {
       error = caught instanceof Error ? caught.message : "Couldn't use that connection link.";
     } finally {
@@ -170,7 +157,7 @@
   <Dialog.Root bind:open>
     <div class="auth-guest-actions">
       <button class="button auth-join" type="button" onclick={startJoin}>Join</button>
-      <Dialog.Trigger class="button-secondary auth-trigger" onclick={startLogin}>Log in</Dialog.Trigger>
+      <Dialog.Trigger class="button-secondary auth-trigger">Log in</Dialog.Trigger>
     </div>
 
     <Dialog.Content class="auth-dialog">

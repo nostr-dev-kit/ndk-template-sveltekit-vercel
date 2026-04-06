@@ -4,6 +4,9 @@
     NDKBlossomList,
     NDKInterestList,
     NDKKind,
+    NDKNip07Signer,
+    NDKNip46Signer,
+    NDKPrivateKeySigner,
     type NDKEvent,
     type NDKUserProfile
   } from '@nostr-dev-kit/ndk';
@@ -21,7 +24,12 @@
     onboardingComplete,
     parseBlossomServer
   } from '$lib/onboarding';
+  import { hasNostrExtension, prepareRemoteSignerPairing, stopNostrConnectSigner } from '$lib/features/auth/auth';
 
+  // ── wizard step ────────────────────────────────────────────────
+  let step = $state<1 | 2 | 3>(1);
+
+  // ── profile fields ─────────────────────────────────────────────
   let activePubkey = $state<string | null>(null);
   let resolvedProfile: NDKUserProfile | undefined = $state();
   let name = $state('');
@@ -43,9 +51,21 @@
   let uploadProgress = $state<number | null>(null);
   let saveError = $state('');
   let uploadError = $state('');
-  let saveMessage = $state('');
   let fileInput: HTMLInputElement | null = $state(null);
 
+  // ── auth (step 3) ───────────────────────────────────────────────
+  let authMode = $state<'extension' | 'private-key' | 'remote'>('extension');
+  let privateKey = $state('');
+  let bunkerUri = $state('');
+  let qrCodeDataUrl = $state('');
+  let nostrConnectUri = $state('');
+  let nostrConnectSigner: NDKNip46Signer | null = $state(null);
+  let authPending = $state(false);
+  let preparingRemoteSigner = $state(false);
+  let connectingBunker = $state(false);
+  let authError = $state('');
+
+  // ── derived ─────────────────────────────────────────────────────
   const currentUser = $derived(ndk.$currentUser);
   const currentSession = $derived(ndk.$sessions?.current);
   const interestEvent = $derived(ndk.$sessions?.getSessionEvent(NDKKind.InterestList));
@@ -53,16 +73,8 @@
   const isReadOnly = $derived(Boolean(ndk.$sessions?.isReadOnly()));
   const avatarDisplayUrl = $derived(avatarPreviewUrl || avatarUrl);
   const normalizedInterests = $derived(normalizeInterestTags(selectedInterests));
-  const onboardingIsComplete = $derived(
-    onboardingComplete({
-      profile: {
-        name: cleanText(name) || undefined,
-        displayName: cleanText(display) || undefined
-      },
-      interests: normalizedInterests
-    })
-  );
-  const canSubmit = $derived(Boolean(currentUser) && !isReadOnly && !saving && !uploadingAvatar);
+  const extensionAvailable = $derived(hasNostrExtension());
+  const canPublish = $derived(Boolean(currentUser) && !isReadOnly && !saving && !uploadingAvatar);
   const writerLabel = $derived(
     displayName(
       {
@@ -70,14 +82,17 @@
         name: cleanText(name) || resolvedProfile?.name,
         displayName: cleanText(display) || resolvedProfile?.displayName
       },
-      'Writer'
+      'You'
     )
   );
+  const step1Valid = $derived(Boolean(cleanText(name) || cleanText(display)));
+  const step2Valid = $derived(normalizedInterests.length > 0);
 
+  // ── profile helpers ─────────────────────────────────────────────
   function clearMessages() {
     saveError = '';
     uploadError = '';
-    saveMessage = '';
+    authError = '';
   }
 
   function clearAvatarPreview() {
@@ -105,7 +120,6 @@
   function seedProfile(profile: NDKUserProfile | undefined) {
     resolvedProfile = profile ? { ...profile } : undefined;
     if (profileTouched) return;
-
     name = cleanText(profile?.name);
     display = cleanText(profile?.displayName);
     about = cleanText(profile?.about || profile?.bio);
@@ -113,43 +127,21 @@
     avatarUrl = cleanText(profile?.picture || profile?.image);
   }
 
-  function noteProfileEdit() {
-    profileTouched = true;
-    clearMessages();
-  }
-
-  function noteInterestEdit() {
-    interestsTouched = true;
-    clearMessages();
-  }
-
-  function noteBlossomEdit() {
-    blossomTouched = true;
-    clearMessages();
-  }
-
   function toggleInterest(value: string) {
     const normalized = normalizeInterestTag(value);
     if (!normalized) return;
-
-    noteInterestEdit();
+    interestsTouched = true;
     selectedInterests = selectedInterests.includes(normalized)
-      ? selectedInterests.filter((interest) => interest !== normalized)
+      ? selectedInterests.filter((i) => i !== normalized)
       : normalizeInterestTags([...selectedInterests, normalized]);
   }
 
   function addCustomInterest() {
     const normalized = normalizeInterestTag(customInterest);
     if (!normalized) return;
-
-    noteInterestEdit();
+    interestsTouched = true;
     selectedInterests = normalizeInterestTags([...selectedInterests, normalized]);
     customInterest = '';
-  }
-
-  function removeInterest(value: string) {
-    noteInterestEdit();
-    selectedInterests = selectedInterests.filter((interest) => interest !== value);
   }
 
   function handleCustomInterestKeydown(event: KeyboardEvent) {
@@ -158,25 +150,18 @@
     addCustomInterest();
   }
 
+  function handleAvatarClick() {
+    fileInput?.click();
+  }
+
   function handleAvatarSelection(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0] ?? null;
-
     clearMessages();
     clearAvatarPreview();
     avatarFile = file;
-
-    if (file) {
-      avatarPreviewUrl = URL.createObjectURL(file);
-    }
-  }
-
-  function removeAvatar() {
-    noteProfileEdit();
-    avatarUrl = '';
-    avatarFile = null;
-    clearAvatarPreview();
-    if (fileInput) fileInput.value = '';
+    if (file) avatarPreviewUrl = URL.createObjectURL(file);
+    profileTouched = true;
   }
 
   async function uploadAvatarFile(): Promise<string | null> {
@@ -185,7 +170,7 @@
     const hasCustomValue = Boolean(cleanText(blossomServer));
     const parsedServer = parseBlossomServer(blossomServer) ?? (hasCustomValue ? null : DEFAULT_BLOSSOM_SERVER);
     if (!parsedServer) {
-      uploadError = 'Enter a valid Blossom server URL.';
+      uploadError = 'Enter a valid storage server URL.';
       return null;
     }
 
@@ -205,9 +190,7 @@
         }
       });
       const uploadedUrl = descriptor.url;
-      if (!uploadedUrl) {
-        throw new Error("The Blossom server didn't return a file URL.");
-      }
+      if (!uploadedUrl) throw new Error("The storage server didn't return a file URL.");
 
       avatarUrl = uploadedUrl;
       avatarFile = null;
@@ -225,13 +208,67 @@
     }
   }
 
-  async function saveOnboarding(event: SubmitEvent) {
-    event.preventDefault();
-
-    if (!currentUser || isReadOnly) {
-      saveError = 'Log in with a signer before publishing onboarding changes.';
-      return;
+  // ── auth helpers (step 3) ───────────────────────────────────────
+  async function loginWithExtension() {
+    if (!ndk.$sessions || authPending || !extensionAvailable) return;
+    try {
+      authPending = true;
+      authError = '';
+      await ndk.$sessions.login(new NDKNip07Signer());
+    } catch (caught) {
+      authError = caught instanceof Error ? caught.message : "Couldn't log in with the extension.";
+    } finally {
+      authPending = false;
     }
+  }
+
+  async function loginWithPrivateKey() {
+    if (!ndk.$sessions || authPending || !privateKey.trim()) return;
+    try {
+      authPending = true;
+      authError = '';
+      await ndk.$sessions.login(new NDKPrivateKeySigner(privateKey.trim()));
+    } catch (caught) {
+      authError = caught instanceof Error ? caught.message : "Couldn't log in with that key.";
+    } finally {
+      authPending = false;
+    }
+  }
+
+  function clearRemoteSigner() {
+    bunkerUri = '';
+    qrCodeDataUrl = '';
+    nostrConnectUri = '';
+    connectingBunker = false;
+    stopNostrConnectSigner(nostrConnectSigner);
+    nostrConnectSigner = null;
+  }
+
+  async function startRemoteSigner() {
+    if (!ndk.$sessions || preparingRemoteSigner || connectingBunker) return;
+    try {
+      authError = '';
+      clearRemoteSigner();
+      preparingRemoteSigner = true;
+      const pairing = await prepareRemoteSignerPairing(ndk);
+      nostrConnectSigner = pairing.signer;
+      nostrConnectUri = pairing.nostrConnectUri;
+      qrCodeDataUrl = pairing.qrCodeDataUrl;
+      void ndk.$sessions.login(pairing.signer).catch((caught) => {
+        if (nostrConnectSigner !== pairing.signer) return;
+        authError = caught instanceof Error ? caught.message : "Couldn't connect to that app.";
+      });
+    } catch (caught) {
+      authError = caught instanceof Error ? caught.message : "Couldn't start pairing.";
+      clearRemoteSigner();
+    } finally {
+      preparingRemoteSigner = false;
+    }
+  }
+
+  // ── publish ─────────────────────────────────────────────────────
+  async function publish() {
+    if (!currentUser || isReadOnly) return;
 
     const nextName = cleanText(name);
     const nextDisplay = cleanText(display);
@@ -241,28 +278,12 @@
     const hasCustomValue = Boolean(cleanText(blossomServer));
     const nextServer = parseBlossomServer(blossomServer) ?? (hasCustomValue ? null : DEFAULT_BLOSSOM_SERVER);
 
-    if (!nextName && !nextDisplay) {
-      saveError = 'Add a name or display name before publishing.';
-      return;
-    }
-
-    if (!nextServer) {
-      saveError = 'Enter a valid Blossom server URL.';
-      return;
-    }
-
-    if (nextInterests.length === 0) {
-      saveError = 'Choose at least one interest.';
-      return;
-    }
+    if (!nextServer) { saveError = 'Enter a valid storage server URL.'; return; }
 
     let nextAvatar = cleanText(avatarUrl);
     if (avatarFile) {
       const uploadedUrl = await uploadAvatarFile();
-      if (!uploadedUrl) {
-        saveError = uploadError || 'Upload your avatar before finishing setup.';
-        return;
-      }
+      if (!uploadedUrl) { saveError = uploadError || 'Upload failed.'; return; }
       nextAvatar = cleanText(uploadedUrl);
     }
 
@@ -282,7 +303,6 @@
       nextProfile.image = nextAvatar || undefined;
 
       currentUser.profile = nextProfile;
-
       try {
         await currentUser.publish();
       } catch (caught) {
@@ -311,65 +331,45 @@
       await nextInterestEvent.publish();
       currentSession?.events.set(NDKKind.InterestList, nextInterestEvent);
 
-      resolvedProfile = { ...nextProfile };
-      profileTouched = false;
-      interestsTouched = false;
-      blossomTouched = false;
-      saveMessage = 'Profile published.';
-
       await goto(`/profile/${profileIdentifier(nextProfile, currentUser.npub)}`);
     } catch (caught) {
-      saveError =
-        caught instanceof Error ? caught.message : "Couldn't publish your onboarding changes.";
+      saveError = caught instanceof Error ? caught.message : "Couldn't publish your profile.";
     } finally {
       saving = false;
     }
   }
 
+  // ── effects ─────────────────────────────────────────────────────
   $effect(() => {
     const pubkey = currentUser?.pubkey ?? null;
-
     if (activePubkey === pubkey) return;
     activePubkey = pubkey;
-
     profileTouched = false;
     interestsTouched = false;
     blossomTouched = false;
     profileLoading = false;
     clearMessages();
     resetDraft();
-
-    if (currentUser?.profile) {
-      seedProfile(currentUser.profile);
-    }
+    if (currentUser?.profile) seedProfile(currentUser.profile);
   });
 
   $effect(() => {
-    if (!profileTouched) {
-      seedProfile(currentUser?.profile ?? resolvedProfile);
-    }
+    if (!profileTouched) seedProfile(currentUser?.profile ?? resolvedProfile);
   });
 
   $effect(() => {
-    if (!interestsTouched) {
-      selectedInterests = interestTagsFromEvent(interestEvent as NDKEvent | null | undefined);
-    }
+    if (!interestsTouched) selectedInterests = interestTagsFromEvent(interestEvent as NDKEvent | null | undefined);
   });
 
   $effect(() => {
-    if (!blossomTouched) {
-      blossomServer = blossomServerFromEvent(blossomEvent as NDKEvent | null | undefined);
-    }
+    if (!blossomTouched) blossomServer = blossomServerFromEvent(blossomEvent as NDKEvent | null | undefined);
   });
 
   $effect(() => {
     if (!currentUser?.pubkey || currentUser.profile || profileLoading) return;
-
     const targetPubkey = currentUser.pubkey;
     profileLoading = true;
-
-    void currentUser
-      .fetchProfile()
+    void currentUser.fetchProfile()
       .then((profile) => {
         if (currentUser?.pubkey !== targetPubkey) return;
         resolvedProfile = profile ?? currentUser.profile ?? undefined;
@@ -380,292 +380,304 @@
         resolvedProfile = currentUser.profile ?? undefined;
       })
       .finally(() => {
-        if (currentUser?.pubkey === targetPubkey) {
-          profileLoading = false;
-        }
+        if (currentUser?.pubkey === targetPubkey) profileLoading = false;
       });
   });
 
   onDestroy(() => {
     clearAvatarPreview();
+    stopNostrConnectSigner(nostrConnectSigner);
   });
 </script>
 
-{#if !currentUser}
-  <section class="section reveal">
-    <article class="panel onboarding-empty">
-      <span class="eyebrow eyebrow-blue">Onboarding</span>
-      <h1>Log in to set up your writer profile.</h1>
-      <p class="muted" style="margin: 0;">
-        Connect a signer from the top bar, then come back here to publish your profile, avatar,
-        and interests.
-      </p>
-    </article>
-  </section>
-{:else}
-  <section class="section reveal">
-    <div class="onboarding-shell">
-      <article class="panel onboarding-hero">
-        <div class="stack">
-          <span class="eyebrow eyebrow-blue">Onboarding</span>
-          <div class="onboarding-heading">
-            <div>
-              <h1>Set up your profile before you publish.</h1>
-              <p class="lead-deck">
-                Add your kind:0 profile, pick the topics you want to read and write about, and
-                store your avatar on Blossom.
-              </p>
-            </div>
+<div class="ob-shell">
+  <!-- progress -->
+  <nav class="ob-progress" aria-label="Setup steps">
+    {#each [1, 2, 3] as s (s)}
+      <button
+        class="ob-progress-step"
+        class:active={step === s}
+        class:done={step > s}
+        type="button"
+        onclick={() => { if (s < step || (s === 2 && step1Valid) || (s === 3 && step1Valid && step2Valid)) step = s as 1|2|3; }}
+        aria-current={step === s ? 'step' : undefined}
+      >
+        <span class="ob-progress-dot"></span>
+        <span class="ob-progress-label">{['About you', 'Interests', 'Publish'][s - 1]}</span>
+      </button>
+    {/each}
+  </nav>
 
-            <div class="onboarding-summary-card">
-              <div class={`status-pill ${onboardingIsComplete ? 'status-green' : 'status-yellow'}`}>
-                {onboardingIsComplete ? 'Ready to publish' : 'Needs a few details'}
-              </div>
-              <strong>{writerLabel}</strong>
-              <span class="muted">{normalizedInterests.length} interests selected</span>
-            </div>
-          </div>
-        </div>
-      </article>
+  <!-- step 1: about you -->
+  {#if step === 1}
+    <div class="ob-step reveal">
+      <div class="ob-step-head">
+        <h1>Tell us about yourself</h1>
+        <p>This is your public author profile. You can change it anytime.</p>
+      </div>
 
-      <div class="onboarding-grid">
-        <form class="onboarding-main" onsubmit={saveOnboarding}>
-          <article class="panel onboarding-card">
-            <div class="onboarding-card-header">
-              <div>
-                <span class="eyebrow eyebrow-green">Kind 0</span>
-                <h2>Profile basics</h2>
-              </div>
-              <p class="muted">This becomes your public author card across the app.</p>
-            </div>
-
-            <div class="onboarding-fields">
-              <label class="field">
-                <span class="muted">Name</span>
-                <input bind:value={name} oninput={noteProfileEdit} placeholder="fiatjaf" />
-              </label>
-
-              <label class="field">
-                <span class="muted">Display name</span>
-                <input bind:value={display} oninput={noteProfileEdit} placeholder="fiatjaf.com" />
-              </label>
-
-              <label class="field">
-                <span class="muted">Bio</span>
-                <textarea
-                  bind:value={about}
-                  oninput={noteProfileEdit}
-                  placeholder="Write a short note about what you publish."
-                ></textarea>
-              </label>
-
-              <label class="field">
-                <span class="muted">Website</span>
-                <input
-                  bind:value={website}
-                  oninput={noteProfileEdit}
-                  placeholder="https://example.com"
-                />
-              </label>
-            </div>
-          </article>
-
-          <article class="panel onboarding-card">
-            <div class="onboarding-card-header">
-              <div>
-                <span class="eyebrow eyebrow-yellow">Blossom</span>
-                <h2>Profile picture</h2>
-              </div>
-              <p class="muted">Upload an avatar now, or leave the slot empty and add one later.</p>
-            </div>
-
-            <div class="onboarding-avatar-row">
-              <div class="onboarding-avatar-preview">
-                {#if avatarDisplayUrl}
-                  <img src={avatarDisplayUrl} alt={`${writerLabel} avatar preview`} />
-                {:else}
-                  <span>{writerLabel.slice(0, 1).toUpperCase()}</span>
-                {/if}
-              </div>
-
-              <div class="stack">
-                <label class="field">
-                  <span class="muted">Blossom server</span>
-                  <input
-                    bind:value={blossomServer}
-                    oninput={noteBlossomEdit}
-                    placeholder={DEFAULT_BLOSSOM_SERVER}
-                  />
-                </label>
-
-                <label class="field">
-                  <span class="muted">Picture file</span>
-                  <input bind:this={fileInput} type="file" accept="image/*" onchange={handleAvatarSelection} />
-                </label>
-
-                <div class="helper-row">
-                  <button
-                    class="button-secondary"
-                    type="button"
-                    onclick={() => void uploadAvatarFile()}
-                    disabled={!avatarFile || uploadingAvatar}
-                  >
-                    {uploadingAvatar ? 'Uploading...' : avatarUrl ? 'Replace picture' : 'Upload picture'}
-                  </button>
-
-                  {#if avatarDisplayUrl}
-                    <button class="button-secondary" type="button" onclick={removeAvatar}>
-                      Remove picture
-                    </button>
-                  {/if}
-                </div>
-
-                {#if uploadProgress !== null}
-                  <p class="caption onboarding-progress">Upload progress: {uploadProgress}%</p>
-                {/if}
-                {#if uploadError}
-                  <p class="error" style="margin: 0;">{uploadError}</p>
-                {/if}
-              </div>
-            </div>
-          </article>
-
-          <article class="panel onboarding-card">
-            <div class="onboarding-card-header">
-              <div>
-                <span class="eyebrow eyebrow-red">NIP-51</span>
-                <h2>Interests</h2>
-              </div>
-              <p class="muted">Choose the subjects you want this reader profile to signal.</p>
-            </div>
-
-            <div class="interest-grid">
-              {#each INTEREST_SUGGESTIONS as interest (interest)}
-                <button
-                  class:active={selectedInterests.includes(interest)}
-                  class="interest-chip"
-                  type="button"
-                  onclick={() => toggleInterest(interest)}
-                >
-                  {interest}
-                </button>
-              {/each}
-            </div>
-
-            <div class="onboarding-custom-interest">
-              <label class="field">
-                <span class="muted">Add your own</span>
-                <input
-                  bind:value={customInterest}
-                  placeholder="long-form"
-                  onkeydown={handleCustomInterestKeydown}
-                />
-              </label>
-              <button class="button-secondary" type="button" onclick={addCustomInterest}>
-                Add interest
-              </button>
-            </div>
-
-            {#if normalizedInterests.length > 0}
-              <div class="topic-row">
-                {#each normalizedInterests as interest (interest)}
-                  <button class="status-pill status-blue interest-pill" type="button" onclick={() => removeInterest(interest)}>
-                    #{interest}
-                  </button>
-                {/each}
+      <div class="ob-step-body">
+        <!-- avatar -->
+        <div class="ob-avatar-zone">
+          <button class="ob-avatar-btn" type="button" onclick={handleAvatarClick} aria-label="Upload photo">
+            {#if avatarDisplayUrl}
+              <img src={avatarDisplayUrl} alt="Your avatar" class="ob-avatar-img" />
+            {:else}
+              <div class="ob-avatar-placeholder">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7Zm0 0v0M15.5 20H8.5A6.5 6.5 0 0 1 2 13.5v0" />
+                  <circle cx="12" cy="12" r="10" />
+                </svg>
+                <span>Add photo</span>
               </div>
             {/if}
-          </article>
-
-          <div class="helper-row onboarding-actions">
-            <button class="button" type="submit" disabled={!canSubmit}>
-              {saving ? 'Publishing...' : 'Publish profile'}
+            <div class="ob-avatar-overlay">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+              </svg>
+            </div>
+          </button>
+          <input bind:this={fileInput} type="file" accept="image/*" onchange={handleAvatarSelection} class="ob-file-input" tabindex="-1" />
+          {#if avatarDisplayUrl}
+            <button class="ob-avatar-remove" type="button" onclick={() => { avatarUrl = ''; avatarFile = null; clearAvatarPreview(); if (fileInput) fileInput.value = ''; }}>
+              Remove
             </button>
-            <a class="button-secondary" href="/">Back to reading</a>
+          {/if}
+          {#if uploadError}
+            <p class="ob-error">{uploadError}</p>
+          {/if}
+        </div>
+
+        <!-- name fields -->
+        <div class="ob-fields">
+          <div class="ob-field-row">
+            <label class="ob-field">
+              <span>Name</span>
+              <input
+                bind:value={name}
+                oninput={() => { profileTouched = true; }}
+                placeholder="Your name"
+                autocomplete="name"
+              />
+            </label>
+            <label class="ob-field">
+              <span>Display name <em>(optional)</em></span>
+              <input
+                bind:value={display}
+                oninput={() => { profileTouched = true; }}
+                placeholder="How you want to appear"
+              />
+            </label>
           </div>
 
-          {#if saveError}
-            <p class="error" style="margin: 0;">{saveError}</p>
-          {/if}
-          {#if saveMessage}
-            <p class="caption" style="margin: 0;">{saveMessage}</p>
-          {/if}
-        </form>
+          <label class="ob-field">
+            <span>Bio <em>(optional)</em></span>
+            <textarea
+              bind:value={about}
+              oninput={() => { profileTouched = true; }}
+              placeholder="What do you write about?"
+              rows="3"
+            ></textarea>
+          </label>
 
-        <aside class="onboarding-sidebar">
-          <article class="panel onboarding-card onboarding-checklist">
-            <span class="eyebrow eyebrow-blue">Checklist</span>
-            <h2>What gets published</h2>
-            <ul>
-              <li class:done={Boolean(cleanText(name) || cleanText(display))}>
-                A kind:0 profile with your name, bio, website, and avatar URL
-              </li>
-              <li class:done={Boolean(avatarUrl || avatarFile)}>
-                A picture uploaded to Blossom with `{DEFAULT_BLOSSOM_SERVER}` as the default server
-              </li>
-              <li class:done={normalizedInterests.length > 0}>
-                A NIP-51 interest list event with your selected topics
-              </li>
-            </ul>
-          </article>
+          <label class="ob-field">
+            <span>Website <em>(optional)</em></span>
+            <input
+              bind:value={website}
+              oninput={() => { profileTouched = true; }}
+              placeholder="https://yoursite.com"
+              type="url"
+            />
+          </label>
+        </div>
+      </div>
 
-          <article class="panel onboarding-card onboarding-preview">
-            <span class="eyebrow eyebrow-green">Preview</span>
-            <div class="onboarding-preview-head">
-              <div class="onboarding-avatar-preview onboarding-avatar-preview-small">
-                {#if avatarDisplayUrl}
-                  <img src={avatarDisplayUrl} alt="" />
-                {:else}
-                  <span>{writerLabel.slice(0, 1).toUpperCase()}</span>
-                {/if}
-              </div>
-
-              <div class="stack tight">
-                <strong>{writerLabel}</strong>
-                {#if cleanText(website)}
-                  <span class="muted">{cleanText(website)}</span>
-                {:else if profileLoading}
-                  <span class="muted">Loading existing profile...</span>
-                {:else}
-                  <span class="muted">No website yet</span>
-                {/if}
-              </div>
-            </div>
-
-            <p class="muted" style="margin: 0;">
-              {cleanText(about) || 'Your bio will appear here once you add one.'}
-            </p>
-
-            {#if normalizedInterests.length > 0}
-              <div class="topic-row">
-                {#each normalizedInterests.slice(0, 6) as interest (interest)}
-                  <span class="status-pill status-yellow">#{interest}</span>
-                {/each}
-              </div>
-            {/if}
-
-            <div class="definition-list compact">
-              <div class="definition-row">
-                <span>Profile route</span>
-                <strong>
-                  /profile/{profileIdentifier(
-                    {
-                      ...(resolvedProfile ?? {}),
-                      name: cleanText(name) || undefined,
-                      displayName: cleanText(display) || undefined
-                    },
-                    currentUser.npub
-                  )}
-                </strong>
-              </div>
-              <div class="definition-row">
-                <span>Blossom</span>
-                <strong>{parseBlossomServer(blossomServer) ?? DEFAULT_BLOSSOM_SERVER}</strong>
-              </div>
-            </div>
-          </article>
-        </aside>
+      <div class="ob-step-footer">
+        <button
+          class="button ob-next"
+          type="button"
+          disabled={!step1Valid}
+          onclick={() => step = 2}
+        >
+          Next — pick your interests
+        </button>
+        {#if !step1Valid}
+          <p class="ob-hint">Add a name to continue</p>
+        {/if}
       </div>
     </div>
-  </section>
-{/if}
+
+  <!-- step 2: interests -->
+  {:else if step === 2}
+    <div class="ob-step reveal">
+      <div class="ob-step-head">
+        <h1>What do you write about?</h1>
+        <p>Pick as many as you like. This shapes your feed and helps readers find you.</p>
+      </div>
+
+      <div class="ob-step-body">
+        <div class="ob-interests">
+          {#each INTEREST_SUGGESTIONS as interest (interest)}
+            <button
+              class="ob-interest-chip"
+              class:selected={normalizedInterests.includes(interest)}
+              type="button"
+              onclick={() => toggleInterest(interest)}
+            >
+              {interest}
+            </button>
+          {/each}
+        </div>
+
+        <div class="ob-custom-interest">
+          <input
+            bind:value={customInterest}
+            placeholder="Add your own topic…"
+            onkeydown={handleCustomInterestKeydown}
+          />
+          <button class="button-secondary" type="button" onclick={addCustomInterest} disabled={!customInterest.trim()}>
+            Add
+          </button>
+        </div>
+
+        {#if normalizedInterests.length > 0}
+          <div class="ob-selected-interests">
+            {#each normalizedInterests as interest (interest)}
+              <button class="ob-selected-chip" type="button" onclick={() => { interestsTouched = true; selectedInterests = selectedInterests.filter(i => i !== interest); }}>
+                #{interest} ×
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <div class="ob-step-footer">
+        <div class="ob-footer-row">
+          <button class="button-secondary" type="button" onclick={() => step = 1}>Back</button>
+          <button
+            class="button ob-next"
+            type="button"
+            disabled={!step2Valid}
+            onclick={() => step = 3}
+          >
+            Next — create your account
+          </button>
+        </div>
+        {#if !step2Valid}
+          <p class="ob-hint">Pick at least one topic to continue</p>
+        {/if}
+      </div>
+    </div>
+
+  <!-- step 3: connect & publish -->
+  {:else}
+    <div class="ob-step reveal">
+      <div class="ob-step-head">
+        {#if currentUser}
+          <h1>You're all set, {writerLabel}</h1>
+          <p>Review your profile and hit publish.</p>
+        {:else}
+          <h1>Last step — connect your account</h1>
+          <p>Sign in to publish your profile to the network.</p>
+        {/if}
+      </div>
+
+      <div class="ob-step-body">
+        {#if !currentUser}
+          <!-- auth options -->
+          <div class="ob-auth">
+            <div class="ob-auth-tabs">
+              <button class="ob-auth-tab" class:active={authMode === 'extension'} type="button" onclick={() => authMode = 'extension'}>Extension</button>
+              <button class="ob-auth-tab" class:active={authMode === 'private-key'} type="button" onclick={() => authMode = 'private-key'}>Secret key</button>
+              <button class="ob-auth-tab" class:active={authMode === 'remote'} type="button" onclick={() => authMode = 'remote'}>Another app</button>
+            </div>
+
+            {#if authMode === 'extension'}
+              <div class="ob-auth-panel">
+                <p class="ob-auth-desc">Use a Nostr browser extension like Alby or nos2x.</p>
+                <button class="button ob-auth-action" type="button" onclick={loginWithExtension} disabled={authPending || !extensionAvailable}>
+                  {authPending ? 'Connecting…' : extensionAvailable ? 'Continue with extension' : 'No extension detected'}
+                </button>
+              </div>
+
+            {:else if authMode === 'private-key'}
+              <div class="ob-auth-panel">
+                <p class="ob-auth-desc">Paste your nsec or hex private key.</p>
+                <textarea class="ob-auth-key" bind:value={privateKey} placeholder="nsec1… or hex key" rows="2"></textarea>
+                <button class="button ob-auth-action" type="button" onclick={loginWithPrivateKey} disabled={authPending || !privateKey.trim()}>
+                  {authPending ? 'Signing in…' : 'Continue with key'}
+                </button>
+              </div>
+
+            {:else}
+              <div class="ob-auth-panel">
+                <p class="ob-auth-desc">Scan with a Nostr signing app or paste a bunker:// link.</p>
+                {#if qrCodeDataUrl}
+                  <div class="ob-qr">
+                    <img src={qrCodeDataUrl} alt="QR code" />
+                  </div>
+                {/if}
+                {#if !qrCodeDataUrl}
+                  <button class="button ob-auth-action" type="button" onclick={startRemoteSigner} disabled={preparingRemoteSigner}>
+                    {preparingRemoteSigner ? 'Generating…' : 'Show QR code'}
+                  </button>
+                {/if}
+              </div>
+            {/if}
+
+            {#if authError}
+              <p class="ob-error">{authError}</p>
+            {/if}
+          </div>
+        {/if}
+
+        <!-- profile summary -->
+        <div class="ob-summary">
+          <div class="ob-summary-avatar">
+            {#if avatarDisplayUrl}
+              <img src={avatarDisplayUrl} alt="" />
+            {:else}
+              <span>{writerLabel.slice(0, 1).toUpperCase()}</span>
+            {/if}
+          </div>
+          <div class="ob-summary-info">
+            <strong class="ob-summary-name">{writerLabel}</strong>
+            {#if cleanText(about)}
+              <p class="ob-summary-bio">{cleanText(about)}</p>
+            {/if}
+            {#if normalizedInterests.length > 0}
+              <div class="ob-summary-interests">
+                {#each normalizedInterests.slice(0, 5) as interest (interest)}
+                  <span class="ob-summary-chip">#{interest}</span>
+                {/each}
+                {#if normalizedInterests.length > 5}
+                  <span class="ob-summary-chip muted">+{normalizedInterests.length - 5} more</span>
+                {/if}
+              </div>
+            {/if}
+          </div>
+        </div>
+      </div>
+
+      <div class="ob-step-footer">
+        <div class="ob-footer-row">
+          <button class="button-secondary" type="button" onclick={() => step = 2}>Back</button>
+          <button
+            class="button ob-next"
+            type="button"
+            disabled={!canPublish}
+            onclick={() => void publish()}
+          >
+            {saving ? 'Publishing…' : 'Publish profile'}
+          </button>
+        </div>
+        {#if !currentUser}
+          <p class="ob-hint">Connect an account above to publish</p>
+        {/if}
+        {#if saveError}
+          <p class="ob-error">{saveError}</p>
+        {/if}
+      </div>
+    </div>
+  {/if}
+</div>
