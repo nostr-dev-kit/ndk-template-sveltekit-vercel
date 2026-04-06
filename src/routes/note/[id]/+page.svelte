@@ -260,14 +260,14 @@
       </p>
 
       {#if isArticle}
-        <Tabs.Root bind:value={activeTab} class="article-tabs" activationMode="manual">
+        <Tabs.Root bind:value={activeTab} activationMode="manual">
           <Tabs.List class="article-tabs-list" aria-label="Article views">
-            <Tabs.Trigger value="article" class="article-tabs-trigger">Article</Tabs.Trigger>
-            <Tabs.Trigger value="comments" class="article-tabs-trigger">
+            <Tabs.Trigger value="article">Article</Tabs.Trigger>
+            <Tabs.Trigger value="comments">
               <span>Comments</span>
               <span class="article-tab-count">{commentCount}</span>
             </Tabs.Trigger>
-            <Tabs.Trigger value="highlights" class="article-tabs-trigger">
+            <Tabs.Trigger value="highlights">
               <span>Highlights</span>
               <span class="article-tab-count">{highlightCount}</span>
             </Tabs.Trigger>

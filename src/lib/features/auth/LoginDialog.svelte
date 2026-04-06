@@ -3,6 +3,7 @@
   import { NDKNip07Signer, NDKNip46Signer, NDKPrivateKeySigner } from '@nostr-dev-kit/ndk';
   import { onDestroy } from 'svelte';
   import * as Dialog from '$lib/components/ui/dialog';
+  import * as Tabs from '$lib/components/ui/tabs';
   import { ndk } from '$lib/ndk/client';
   import ExtensionLoginForm from './ExtensionLoginForm.svelte';
   import PrivateKeyLoginForm from './PrivateKeyLoginForm.svelte';
@@ -192,53 +193,42 @@
       </div>
 
       <div class="auth-dialog-body">
-        <div class="auth-switcher" role="tablist" aria-label="Login methods">
-          <button
-            class:active={mode === 'extension'}
-            class="button-secondary auth-switcher-button"
-            type="button"
-            onclick={() => (mode = 'extension')}
-          >
-            Extension
-          </button>
-          <button
-            class:active={mode === 'private-key'}
-            class="button-secondary auth-switcher-button"
-            type="button"
-            onclick={() => (mode = 'private-key')}
-          >
-            Secret key
-          </button>
-          <button
-            class:active={mode === 'remote'}
-            class="button-secondary auth-switcher-button"
-            type="button"
-            onclick={() => (mode = 'remote')}
-          >
-            Another app
-          </button>
-        </div>
+        <Tabs.Root bind:value={mode}>
+          <Tabs.List class="auth-switcher" aria-label="Login methods">
+            <Tabs.Trigger value="extension" class="auth-switcher-button">Extension</Tabs.Trigger>
+            <Tabs.Trigger value="private-key" class="auth-switcher-button">Secret key</Tabs.Trigger>
+            <Tabs.Trigger value="remote" class="auth-switcher-button">Another app</Tabs.Trigger>
+          </Tabs.List>
 
-        {#if mode === 'extension'}
-          <ExtensionLoginForm
-            hasExtension={extensionAvailable}
-            {pending}
-            onLogin={loginWithExtension}
-          />
-        {:else if mode === 'private-key'}
-          <PrivateKeyLoginForm bind:secretKey={privateKey} {pending} onLogin={loginWithPrivateKey} />
-        {:else}
-          <RemoteLoginForm
-            bind:bunkerUri
-            {connectingBunker}
-            {nostrConnectUri}
-            {preparingRemoteSigner}
-            {qrCodeDataUrl}
-            {remoteSignerReady}
-            onLoginWithBunker={loginWithBunker}
-            onStartRemoteSigner={startRemoteSigner}
-          />
-        {/if}
+          <Tabs.Content value="extension" class="auth-mode-panel">
+            <ExtensionLoginForm
+              hasExtension={extensionAvailable}
+              {pending}
+              onLogin={loginWithExtension}
+            />
+          </Tabs.Content>
+
+          <Tabs.Content value="private-key" class="auth-mode-panel">
+            <PrivateKeyLoginForm
+              bind:secretKey={privateKey}
+              {pending}
+              onLogin={loginWithPrivateKey}
+            />
+          </Tabs.Content>
+
+          <Tabs.Content value="remote" class="auth-mode-panel">
+            <RemoteLoginForm
+              bind:bunkerUri
+              {connectingBunker}
+              {nostrConnectUri}
+              {preparingRemoteSigner}
+              {qrCodeDataUrl}
+              {remoteSignerReady}
+              onLoginWithBunker={loginWithBunker}
+              onStartRemoteSigner={startRemoteSigner}
+            />
+          </Tabs.Content>
+        </Tabs.Root>
 
         {#if error}
           <p class="error" style="margin: 0;">{error}</p>
