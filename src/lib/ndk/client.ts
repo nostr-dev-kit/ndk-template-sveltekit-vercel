@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { NDKBlossomList, NDKInterestList } from '@nostr-dev-kit/ndk';
 import { createNDK } from '@nostr-dev-kit/svelte';
 import { LocalStorage } from '@nostr-dev-kit/sessions';
 import { APP_NAME, DEFAULT_RELAYS } from '$lib/ndk/config';
@@ -14,7 +15,8 @@ export const ndk = createNDK({
       follows: true,
       mutes: true,
       relayList: true,
-      wallet: false
+      wallet: false,
+      monitor: [NDKInterestList, NDKBlossomList]
     }
   }
 });

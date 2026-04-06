@@ -3,6 +3,7 @@ import { APP_NAME, APP_TAGLINE } from '$lib/ndk/config';
 import {
   articleSummary,
   avatarUrl,
+  cleanExcerptText,
   cleanText,
   displayNip05,
   displayName,
@@ -53,6 +54,17 @@ export function buildAboutSeo(url: URL): SeoMetadata {
     canonical: canonicalUrl(url),
     type: 'website',
     image: defaultImage(url, `${SITE_NAME} preview`)
+  };
+}
+
+export function buildOnboardingSeo(url: URL): SeoMetadata {
+  return {
+    title: `Set up your profile • ${SITE_NAME}`,
+    description:
+      'Create your writer profile, choose your interests, and upload an avatar for Relay Press.',
+    canonical: canonicalUrl(url),
+    type: 'website',
+    image: defaultImage(url, `${SITE_NAME} onboarding preview`)
   };
 }
 
@@ -152,7 +164,7 @@ function cleanSnippet(value: string | undefined): string | undefined {
 }
 
 function previewSnippet(value: string, fallback: string): string {
-  const sanitized = cleanText(
+  const sanitized = cleanExcerptText(
     value
       .replace(/\(\s*https?:\/\/[^)]+\)/g, ' ')
       .replace(/https?:\/\/\S+/g, ' ')

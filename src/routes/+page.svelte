@@ -12,12 +12,13 @@
     articleSummary,
     articleTitle,
     articleTopics,
-    formatDisplayDate
+    formatDisplayDate,
+    noteExcerpt
   } from '$lib/ndk/format';
 
   let { data }: PageProps = $props();
 
-  const discussedArticles = ndk.$metaSubscribe(() => {
+  const discussedComments = ndk.$metaSubscribe(() => {
     if (!browser) return undefined;
 
     return {
@@ -35,8 +36,9 @@
   });
 
   const seedArticles = $derived((data.articles ?? []).map((event: NostrEvent) => new NDKEvent(ndk, event)));
-  const liveArticles = $derived(mergeUniqueArticles(discussedArticles.events, recentArticles.events, 12));
+  const liveArticles = $derived(mergeUniqueArticles(recentArticles.events, seedArticles, 12));
   const articles = $derived(liveArticles.length > 0 ? liveArticles : seedArticles);
+  const activeComments = $derived(discussedComments.events.slice(0, 4));
   const featuredArticle = $derived.by(() =>
     articles.find((event) => Boolean(articleImageUrl(event.rawEvent())))
   );
@@ -50,9 +52,8 @@
 
     return articles.filter((event) => event.tagId() !== featuredId);
   });
-  const railArticles = $derived(nonFeaturedArticles.slice(0, 4));
-  const latestArticles = $derived(nonFeaturedArticles.slice(4, 8));
-  const archiveArticles = $derived(nonFeaturedArticles.slice(8, 11));
+  const latestArticles = $derived(nonFeaturedArticles.slice(0, 4));
+  const archiveArticles = $derived(nonFeaturedArticles.slice(4, 7));
 
   let featuredImageLoaded = $state(false);
 
@@ -79,6 +80,10 @@
 
     return merged;
   }
+
+  function stableEventKey(event: NDKEvent): string {
+    return event.tagId() || event.id || `${event.kind}:${event.pubkey}:${event.created_at ?? 0}`;
+  }
 </script>
 
 <section class="lead-grid section">
@@ -99,7 +104,7 @@
 
         <div class="lead-story-badges">
           <span class="eyebrow eyebrow-blue">Featured</span>
-          {#each featuredTopics as topic}
+          {#each featuredTopics as topic (topic)}
             <span class="lead-story-topic">{topic}</span>
           {/each}
         </div>
@@ -134,19 +139,18 @@
 
   <aside class="panel story-rail reveal" style="--index: 1;" use:reveal>
     <div class="section-intro">
-      <h2>Active essays</h2>
+      <h2>Recent comments</h2>
     </div>
 
     <div class="story-rail-list">
-      {#if railArticles.length > 0}
-        {#each railArticles as event, index}
-          <a class="rail-story" href={`/note/${event.encode()}`} style={`--index: ${index};`}>
+      {#if activeComments.length > 0}
+        {#each activeComments as event, index (stableEventKey(event))}
+          <a class="rail-story rail-story-comment" href={`/note/${event.encode()}`} style={`--index: ${index};`}>
             <div class="story-pub-meta">
               <span>{formatDisplayDate(articlePublishedAt(event.rawEvent()))}</span>
-              <span>{articleReadTimeMinutes(event.content)} min read</span>
+              <span>Comment</span>
             </div>
-            <h3>{articleTitle(event.rawEvent())}</h3>
-            <p>{articleSummary(event.rawEvent(), 120)}</p>
+            <p class="rail-comment-body">{noteExcerpt(event.content, 180)}</p>
             <div class="story-byline compact">
               <StoryAuthor
                 {ndk}
@@ -158,7 +162,7 @@
           </a>
         {/each}
       {:else}
-        <p class="muted" style="margin: 0;">No discussed essays yet.</p>
+        <p class="muted" style="margin: 0;">No comments yet.</p>
       {/if}
     </div>
   </aside>
@@ -171,7 +175,7 @@
 
   <div class="story-grid">
     {#if latestArticles.length > 0}
-      {#each latestArticles as event, index}
+      {#each latestArticles as event, index (stableEventKey(event))}
         <a
           class="panel story-link-card story-card reveal"
           href={`/note/${event.encode()}`}
@@ -210,7 +214,7 @@
     </div>
 
     <div class="archive-grid">
-      {#each archiveArticles as event, index}
+      {#each archiveArticles as event, index (stableEventKey(event))}
         <a
           class="archive-card story-link-card reveal"
           href={`/note/${event.encode()}`}

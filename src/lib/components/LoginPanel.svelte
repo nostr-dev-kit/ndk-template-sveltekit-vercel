@@ -1,13 +1,21 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
-  import { NDKNip07Signer, NDKNip46Signer, NDKPrivateKeySigner } from '@nostr-dev-kit/ndk';
+  import {
+    NDKKind,
+    NDKNip07Signer,
+    NDKNip46Signer,
+    NDKPrivateKeySigner,
+    type NDKEvent,
+    type NDKUserProfile
+  } from '@nostr-dev-kit/ndk';
   import { onDestroy } from 'svelte';
   import QRCode from 'qrcode';
   import * as Dialog from '$lib/components/ui/dialog';
   import { APP_NAME } from '$lib/ndk/config';
-  import { cleanText, displayName } from '$lib/ndk/format';
+  import { cleanText, displayName, profileIdentifier } from '$lib/ndk/format';
   import { ndk } from '$lib/ndk/client';
+  import { interestTagsFromEvent, onboardingComplete } from '$lib/onboarding';
 
   let open = $state(false);
   let mode = $state<'extension' | 'private-key' | 'remote'>('extension');
@@ -20,19 +28,34 @@
   let qrCodeDataUrl = $state('');
   let nostrConnectUri = $state('');
   let nostrConnectSigner: NDKNip46Signer | null = $state(null);
+  let resolvedProfile: NDKUserProfile | undefined = $state();
+  let loadingProfile = $state(false);
   let error = $state('');
   const currentUser = $derived(ndk.$currentUser);
+  const currentProfile = $derived(resolvedProfile ?? currentUser?.profile ?? undefined);
+  const interestEvent = $derived(ndk.$sessions?.getSessionEvent(NDKKind.InterestList));
   const hasExtension = $derived(browser && typeof window !== 'undefined' && 'nostr' in window);
   const remoteSignerReady = $derived(Boolean(qrCodeDataUrl && nostrConnectUri));
   const currentUserLabel = $derived.by(() => {
     if (!currentUser) return '';
 
     return (
-      displayName(currentUser.profile ?? undefined, '') ||
-      cleanText(currentUser.profile?.nip05) ||
+      displayName(currentProfile, '') ||
+      cleanText(currentProfile?.nip05) ||
       'Signed in'
     );
   });
+  const needsOnboarding = $derived.by(() => {
+    if (!currentUser || ndk.$sessions?.isReadOnly()) return false;
+
+    return !onboardingComplete({
+      profile: currentProfile,
+      interests: interestTagsFromEvent(interestEvent as NDKEvent | null | undefined)
+    });
+  });
+  const profileHref = $derived(
+    currentUser ? `/profile/${profileIdentifier(currentProfile, currentUser.npub)}` : '/'
+  );
 
   function resetRemoteSigner() {
     bunkerUri = '';
@@ -61,6 +84,40 @@
     if (mode !== 'remote') {
       resetRemoteSigner();
     }
+  });
+
+  $effect(() => {
+    if (!currentUser?.pubkey) {
+      resolvedProfile = undefined;
+      loadingProfile = false;
+      return;
+    }
+
+    if (currentUser.profile) {
+      resolvedProfile = currentUser.profile;
+      return;
+    }
+
+    if (loadingProfile) return;
+
+    const targetPubkey = currentUser.pubkey;
+    loadingProfile = true;
+
+    void currentUser
+      .fetchProfile()
+      .then((profile) => {
+        if (currentUser?.pubkey !== targetPubkey) return;
+        resolvedProfile = profile ?? currentUser.profile ?? undefined;
+      })
+      .catch(() => {
+        if (currentUser?.pubkey !== targetPubkey) return;
+        resolvedProfile = currentUser.profile ?? undefined;
+      })
+      .finally(() => {
+        if (currentUser?.pubkey === targetPubkey) {
+          loadingProfile = false;
+        }
+      });
   });
 
   async function finishLogin() {
@@ -194,10 +251,15 @@
 
 {#if currentUser}
   <div class="login-shell">
-    <div class="status-pill status-green">Signed in</div>
+    <div class={`status-pill ${needsOnboarding ? 'status-yellow' : 'status-green'}`}>
+      {needsOnboarding ? 'Finish setup' : 'Signed in'}
+    </div>
     <div class="actions">
       <span class="muted">{currentUserLabel}</span>
-      <a class="button-secondary" href={`/profile/${currentUser.npub}`}>Profile</a>
+      {#if needsOnboarding}
+        <a class="button-secondary" href="/onboarding">Finish setup</a>
+      {/if}
+      <a class="button-secondary" href={profileHref}>Profile</a>
       <button class="button-secondary" type="button" onclick={logout}>Log out</button>
     </div>
   </div>

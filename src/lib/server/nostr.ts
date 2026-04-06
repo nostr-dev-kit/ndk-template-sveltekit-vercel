@@ -7,7 +7,12 @@ import NDK, {
 import { APP_NAME, DEFAULT_RELAYS } from '$lib/ndk/config';
 
 const CONNECT_TIMEOUT_MS = 2500;
+const FETCH_TIMEOUT_MS = 2500;
+const FRONT_PAGE_CACHE_TTL_MS = 60_000;
 const clients = new Map<string, Promise<NDK>>();
+let frontPageCache: NDKEvent[] = [];
+let frontPageCacheUpdatedAt = 0;
+let frontPageRefresh: Promise<void> | undefined;
 
 export async function getServerNdk(relays: readonly string[] = DEFAULT_RELAYS): Promise<NDK> {
   const key = relays.join(',');
@@ -40,23 +45,34 @@ export async function fetchUserWithProfile(identifier: string): Promise<{
   profile?: NDKUserProfile;
 }> {
   const ndk = await getServerNdk();
-  const user = await ndk.fetchUser(identifier);
+  const user = await withTimeout(ndk.fetchUser(identifier), undefined, `fetchUser(${identifier})`);
   if (!user) return {};
 
-  const profile = user.profile ?? (await user.fetchProfile({ closeOnEose: true }).catch(() => null)) ?? undefined;
+  const profile =
+    user.profile ??
+    (await withTimeout(
+      user.fetchProfile({ closeOnEose: true }).catch(() => null),
+      null,
+      `fetchProfile(${identifier})`
+    )) ??
+    undefined;
 
   return { user, profile };
 }
 
 export async function fetchRecentNotesByAuthor(pubkey: string, limit = 8): Promise<NDKEvent[]> {
   const ndk = await getServerNdk();
-  const events = await ndk.fetchEvents(
-    {
-      kinds: [1],
-      authors: [pubkey],
-      limit
-    },
-    { closeOnEose: true }
+  const events = await withTimeout(
+    ndk.fetchEvents(
+      {
+        kinds: [1],
+        authors: [pubkey],
+        limit
+      },
+      { closeOnEose: true }
+    ),
+    undefined,
+    `fetchRecentNotesByAuthor(${pubkey})`
   );
 
   return Array.from(events ?? []).sort((left, right) => (right.created_at ?? 0) - (left.created_at ?? 0));
@@ -64,12 +80,16 @@ export async function fetchRecentNotesByAuthor(pubkey: string, limit = 8): Promi
 
 export async function fetchRecentArticles(limit = 10): Promise<NDKEvent[]> {
   const ndk = await getServerNdk();
-  const events = await ndk.fetchEvents(
-    {
-      kinds: [30023],
-      limit
-    },
-    { closeOnEose: true }
+  const events = await withTimeout(
+    ndk.fetchEvents(
+      {
+        kinds: [30023],
+        limit
+      },
+      { closeOnEose: true }
+    ),
+    undefined,
+    `fetchRecentArticles(${limit})`
   );
 
   return Array.from(events ?? []).sort(sortByPublishedTime);
@@ -81,13 +101,17 @@ export async function fetchCommentedArticles(
 ): Promise<NDKEvent[]> {
   const ndk = await getServerNdk();
   const pointerEvents = Array.from(
-    (await ndk.fetchEvents(
-      {
-        kinds: [1111],
-        '#K': ['30023'],
-        limit: pointerLimit
-      },
-      { closeOnEose: true }
+    (await withTimeout(
+      ndk.fetchEvents(
+        {
+          kinds: [1111],
+          '#K': ['30023'],
+          limit: pointerLimit
+        },
+        { closeOnEose: true }
+      ),
+      undefined,
+      `fetchCommentedArticles:pointers(${pointerLimit})`
     )) ?? []
   );
 
@@ -102,9 +126,13 @@ export async function fetchCommentedArticles(
     return [];
   }
 
-  const targetEvents = Array.from((await ndk.fetchEvents(filters, { closeOnEose: true })) ?? []).filter(
-    (event) => event.kind === 30023
-  );
+  const targetEvents = Array.from(
+    (await withTimeout(
+      ndk.fetchEvents(filters, { closeOnEose: true }),
+      undefined,
+      `fetchCommentedArticles:targets(${filters.length})`
+    )) ?? []
+  ).filter((event) => event.kind === 30023);
 
   const targetMetrics = new Map<string, { count: number; latestPointerTime: number }>();
 
@@ -136,23 +164,23 @@ export async function fetchCommentedArticles(
 }
 
 export async function fetchFrontPageArticles(limit = 10): Promise<NDKEvent[]> {
-  const [commentedArticles, recentArticles] = await Promise.all([
-    fetchCommentedArticles(limit),
-    fetchRecentArticles(limit)
-  ]);
-
-  return mergeUniqueEvents(commentedArticles, recentArticles, limit);
+  refreshFrontPageArticles(limit);
+  return frontPageCache.slice(0, limit);
 }
 
 export async function fetchRecentArticlesByAuthor(pubkey: string, limit = 8): Promise<NDKEvent[]> {
   const ndk = await getServerNdk();
-  const events = await ndk.fetchEvents(
-    {
-      kinds: [30023],
-      authors: [pubkey],
-      limit
-    },
-    { closeOnEose: true }
+  const events = await withTimeout(
+    ndk.fetchEvents(
+      {
+        kinds: [30023],
+        authors: [pubkey],
+        limit
+      },
+      { closeOnEose: true }
+    ),
+    undefined,
+    `fetchRecentArticlesByAuthor(${pubkey})`
   );
 
   return Array.from(events ?? []).sort(sortByPublishedTime);
@@ -164,14 +192,70 @@ export async function fetchNoteWithAuthor(identifier: string): Promise<{
   profile?: NDKUserProfile;
 }> {
   const ndk = await getServerNdk();
-  const event = await ndk.fetchEvent(identifier, { closeOnEose: true });
+  const event = await withTimeout(
+    ndk.fetchEvent(identifier, { closeOnEose: true }),
+    undefined,
+    `fetchNoteWithAuthor(${identifier})`
+  );
   if (!event) return {};
 
   const author = ndk.getUser({ pubkey: event.pubkey });
   const profile =
-    author.profile ?? (await author.fetchProfile({ closeOnEose: true }).catch(() => null)) ?? undefined;
+    author.profile ??
+    (await withTimeout(
+      author.fetchProfile({ closeOnEose: true }).catch(() => null),
+      null,
+      `fetchNoteWithAuthor:profile(${identifier})`
+    )) ??
+    undefined;
 
   return { event, author, profile };
+}
+
+export async function fetchArticleComments(event: NDKEvent, limit = 120): Promise<NDKEvent[]> {
+  const ndk = await getServerNdk();
+  const filters = buildReferenceFilters(targetReferences(event), [1111], {
+    addressTag: 'A',
+    idTag: 'E',
+    limit
+  });
+
+  if (filters.length === 0) {
+    return [];
+  }
+
+  const events = await withTimeout(
+    ndk.fetchEvents(filters, { closeOnEose: true }),
+    undefined,
+    `fetchArticleComments(${event.tagId()})`
+  );
+
+  return Array.from(events ?? [])
+    .filter((comment) => comment.kind === 1111)
+    .sort((left, right) => (left.created_at ?? 0) - (right.created_at ?? 0));
+}
+
+export async function fetchArticleHighlights(event: NDKEvent, limit = 80): Promise<NDKEvent[]> {
+  const ndk = await getServerNdk();
+  const filters = buildReferenceFilters(targetReferences(event), [9802], {
+    addressTag: 'a',
+    idTag: 'e',
+    limit
+  });
+
+  if (filters.length === 0) {
+    return [];
+  }
+
+  const events = await withTimeout(
+    ndk.fetchEvents(filters, { closeOnEose: true }),
+    undefined,
+    `fetchArticleHighlights(${event.tagId()})`
+  );
+
+  return Array.from(events ?? [])
+    .filter((highlight) => highlight.kind === 9802)
+    .sort((left, right) => (right.created_at ?? 0) - (left.created_at ?? 0));
 }
 
 function sortByPublishedTime(left: NDKEvent, right: NDKEvent): number {
@@ -302,6 +386,43 @@ function targetReferences(target: NDKEvent): Set<string> {
   return references;
 }
 
+function buildReferenceFilters(
+  references: Set<string>,
+  kinds: number[],
+  options: {
+    addressTag: string;
+    idTag: string;
+    limit: number;
+  }
+): NDKFilter[] {
+  const ids: string[] = [];
+  const addresses: string[] = [];
+
+  for (const reference of references) {
+    if (reference.includes(':')) {
+      addresses.push(reference);
+    } else {
+      ids.push(reference);
+    }
+  }
+
+  const filters: NDKFilter[] = [];
+
+  if (addresses.length > 0) {
+    const filter = { kinds, limit: options.limit } as NDKFilter & Record<`#${string}`, string[]>;
+    filter[`#${options.addressTag}`] = addresses;
+    filters.push(filter);
+  }
+
+  if (ids.length > 0) {
+    const filter = { kinds, limit: options.limit } as NDKFilter & Record<`#${string}`, string[]>;
+    filter[`#${options.idTag}`] = ids;
+    filters.push(filter);
+  }
+
+  return filters;
+}
+
 function publishedAtSeconds(event: Pick<NDKEvent, 'created_at' | 'tags'>): number {
   const publishedTag = event.tags.find((tag) => tag[0] === 'published_at')?.[1];
   const publishedAt = Number(publishedTag);
@@ -311,4 +432,48 @@ function publishedAtSeconds(event: Pick<NDKEvent, 'created_at' | 'tags'>): numbe
   }
 
   return event.created_at ?? 0;
+}
+
+async function withTimeout<T>(promise: Promise<T>, fallback: T, label: string): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timeoutHandle = setTimeout(() => {
+          console.warn(`${label} timed out after ${FETCH_TIMEOUT_MS}ms`);
+          resolve(fallback);
+        }, FETCH_TIMEOUT_MS);
+      })
+    ]);
+  } finally {
+    if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+}
+
+function refreshFrontPageArticles(limit: number): void {
+  if (frontPageRefresh) return;
+
+  const stale = Date.now() - frontPageCacheUpdatedAt > FRONT_PAGE_CACHE_TTL_MS;
+  const underfilled = frontPageCache.length < limit;
+
+  if (!stale && !underfilled) {
+    return;
+  }
+
+  frontPageRefresh = (async () => {
+    const events = await fetchRecentArticles(limit);
+
+    if (events.length > 0 || frontPageCache.length === 0) {
+      frontPageCache = events;
+      frontPageCacheUpdatedAt = Date.now();
+    }
+  })()
+    .catch((error) => {
+      console.warn('front page cache refresh failed', error);
+    })
+    .finally(() => {
+      frontPageRefresh = undefined;
+    });
 }

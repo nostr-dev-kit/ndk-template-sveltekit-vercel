@@ -37,6 +37,8 @@ export function noteExcerpt(content: string, maxLength = 220): string {
       .replace(/^\s*>\s?/gm, '')
       .replace(/^\s*[-*+]\s+/gm, '')
       .replace(/\[(.*?)\]\((.*?)\)/g, '$1')
+      .replace(/nostr:(npub1[a-z0-9]{58}|nprofile1[a-z0-9]+)/gi, 'someone on Nostr')
+      .replace(/nostr:(note1[a-z0-9]{58}|nevent1[a-z0-9]+|naddr1[a-z0-9]+)/gi, 'a referenced post')
       .replace(/[*_~`]+/g, '')
       .replace(/\s+/g, ' ')
   );
@@ -49,7 +51,7 @@ export function articleTitle(event: EventWithContent): string {
 }
 
 export function articleSummary(event: EventWithTiming, maxLength = 220): string {
-  const summary = cleanText(tagValue(event.tags, 'summary'));
+  const summary = cleanExcerptText(tagValue(event.tags, 'summary'));
   return summary || noteExcerpt(event.content, maxLength);
 }
 
@@ -108,6 +110,12 @@ export function cleanText(value: string | null | undefined): string {
   return typeof value === 'string'
     ? value.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim()
     : '';
+}
+
+export function cleanExcerptText(value: string | null | undefined): string {
+  return cleanText(value)
+    .replace(/nostr:(npub1[a-z0-9]{58}|nprofile1[a-z0-9]+)/gi, 'someone on Nostr')
+    .replace(/nostr:(note1[a-z0-9]{58}|nevent1[a-z0-9]+|naddr1[a-z0-9]+)/gi, 'a referenced post');
 }
 
 export function truncate(value: string, maxLength: number): string {

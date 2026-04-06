@@ -1,6 +1,6 @@
 import type { NostrEvent } from '@nostr-dev-kit/ndk';
 import type { PageServerLoad } from './$types';
-import { fetchNoteWithAuthor } from '$lib/server/nostr';
+import { fetchArticleComments, fetchArticleHighlights, fetchNoteWithAuthor } from '$lib/server/nostr';
 import { profileIdentifier } from '$lib/ndk/format';
 import { buildMissingSeo, buildNoteSeo } from '$lib/seo';
 
@@ -19,9 +19,16 @@ export const load: PageServerLoad = async ({ params, setHeaders, url }) => {
       };
     }
 
+    const [comments, highlights] =
+      event.kind === 30023
+        ? await Promise.all([fetchArticleComments(event), fetchArticleHighlights(event)])
+        : [[], []];
+
     return {
       missing: false,
       event: event.rawEvent() as NostrEvent,
+      comments: comments.map((comment) => comment.rawEvent() as NostrEvent),
+      highlights: highlights.map((highlight) => highlight.rawEvent() as NostrEvent),
       authorPubkey: author.pubkey,
       authorIdentifier: profileIdentifier(profile, author.npub),
       authorNpub: author.npub,

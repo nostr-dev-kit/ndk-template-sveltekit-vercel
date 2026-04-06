@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { NDKSvelte } from '@nostr-dev-kit/svelte';
   import { Marked } from 'marked';
-  import { getContext, mount, onMount, setContext } from 'svelte';
+  import { getContext, mount, onMount, setContext, unmount } from 'svelte';
   import { createNostrMarkdownExtensions } from '../../builders/markdown-nostr-extensions/index.js';
   import EmbeddedEvent from '../embedded-event.svelte';
   import { defaultContentRenderer, type ContentRenderer } from '../content-renderer';
@@ -72,6 +72,8 @@
         return;
       }
 
+      placeholder.replaceChildren();
+
       const mounted = mount(renderer.mentionComponent, {
         target: placeholder,
         props: {
@@ -82,7 +84,7 @@
       });
 
       mountedComponents.push({
-        unmount: () => (mounted as any).unmount?.()
+        unmount: () => unmount(mounted)
       });
     });
 
@@ -90,6 +92,8 @@
     eventRefs.forEach((placeholder) => {
       const bech32 = placeholder.getAttribute('data-bech32');
       if (!bech32) return;
+
+      placeholder.replaceChildren();
 
       const mounted = mount(EmbeddedEvent, {
         target: placeholder,
@@ -102,7 +106,7 @@
       });
 
       mountedComponents.push({
-        unmount: () => (mounted as any).unmount?.()
+        unmount: () => unmount(mounted)
       });
     });
 
@@ -116,6 +120,8 @@
         return;
       }
 
+      placeholder.replaceChildren();
+
       const mounted = mount(renderer.hashtagComponent, {
         target: placeholder,
         props: {
@@ -126,7 +132,7 @@
       });
 
       mountedComponents.push({
-        unmount: () => (mounted as any).unmount?.()
+        unmount: () => unmount(mounted)
       });
     });
   }

@@ -151,11 +151,6 @@
 
   <section class="section bento author-publication">
     <div class="span-8 stack" id="stories">
-      <div class="section-intro reveal" use:reveal>
-        <h2>Latest writing</h2>
-        <p class="caption" style="margin: 0;">Newest first.</p>
-      </div>
-
       {#if featuredArticle}
         <a class="panel story-link-card author-lead-story reveal" href={`/note/${featuredArticle.encode()}`} use:reveal>
           <div class="author-lead-copy">
