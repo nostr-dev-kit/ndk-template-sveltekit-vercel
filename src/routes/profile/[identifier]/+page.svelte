@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { PageProps } from './$types';
+  import { page } from '$app/state';
   import { browser } from '$app/environment';
+  import { createFetchUser } from '@nostr-dev-kit/svelte';
   import { NDKEvent, type NostrEvent } from '@nostr-dev-kit/ndk';
   import { User } from '$lib/ndk/ui/user';
   import { reveal } from '$lib/actions/reveal';
@@ -19,12 +21,16 @@
   import { ndk } from '$lib/ndk/client';
 
   let { data }: PageProps = $props();
+  const routeIdentifier = $derived(page.params.identifier || data.identifier || '');
+  const user = createFetchUser(ndk, () => routeIdentifier || data.npub || data.pubkey || '');
+  const profile = $derived(user.profile ?? data.profile);
+  const pubkey = $derived(user.pubkey ?? data.pubkey ?? '');
 
   const liveArticles = ndk.$subscribe(() => {
-    if (!browser || !data.pubkey) return undefined;
+    if (!browser || !pubkey) return undefined;
 
     return {
-      filters: [{ kinds: [30023], authors: [data.pubkey], limit: 12 }]
+      filters: [{ kinds: [30023], authors: [pubkey], limit: 12 }]
     };
   });
 
@@ -35,18 +41,19 @@
   const articles = $derived(liveArticles.events.length > 0 ? liveArticles.events : seedArticles);
   const featuredArticle = $derived(articles[0]);
   const moreArticles = $derived(featuredArticle ? articles.slice(1) : []);
-  const name = $derived(data.pubkey ? displayName(data.profile, 'Author') : 'Author');
+  const missing = $derived(!pubkey && data.missing && user.$loaded);
+  const name = $derived(pubkey ? displayName(profile, 'Author') : 'Author');
   const bio = $derived.by(() => {
-    const candidate = cleanText(data.profile?.about) || cleanText(data.profile?.bio);
+    const candidate = cleanText(profile?.about) || cleanText(profile?.bio);
     if (!candidate || candidate === '~' || candidate === '-' || candidate === '_') {
       return 'Recent writing collected here.';
     }
     return candidate;
   });
-  const handle = $derived(cleanText(typeof data.profile?.name === 'string' ? data.profile.name : ''));
-  const nip05 = $derived(displayNip05(data.profile));
-  const website = $derived(cleanText(typeof data.profile?.website === 'string' ? data.profile.website : ''));
-  const location = $derived(cleanText(typeof data.profile?.location === 'string' ? data.profile.location : ''));
+  const handle = $derived(cleanText(typeof profile?.name === 'string' ? profile.name : ''));
+  const nip05 = $derived(displayNip05(profile));
+  const website = $derived(cleanText(typeof profile?.website === 'string' ? profile.website : ''));
+  const location = $derived(cleanText(typeof profile?.location === 'string' ? profile.location : ''));
   const storyCountLabel = $derived(`${articles.length} ${articles.length === 1 ? 'story' : 'stories'}`);
   const focusTopics = $derived(
     [...new Set(articles.flatMap((event) => articleTopics(event.rawEvent(), 4)))].slice(0, 8)
@@ -57,7 +64,6 @@
   const featuredImageUrl = $derived(
     featuredArticle ? articleImageUrl(featuredArticle.rawEvent()) : undefined
   );
-
   function websiteLabel(url: string): string {
     try {
       return new URL(url).hostname.replace(/^www\./, '');
@@ -71,7 +77,7 @@
   }
 </script>
 
-{#if data.missing}
+{#if missing}
   <section class="section reveal" use:reveal>
     <article class="panel stack">
       <h1>We could not find that profile</h1>
@@ -82,7 +88,7 @@
   <section class="section reveal" use:reveal>
     <article class="panel author-stage">
       <div class="author-banner">
-        <User.Root {ndk} pubkey={data.pubkey} profile={data.profile}>
+        <User.Root {ndk} pubkey={pubkey} profile={profile}>
           <User.Banner class="author-banner-media" />
         </User.Root>
         <div class="author-banner-wash" aria-hidden="true"></div>
@@ -90,7 +96,7 @@
 
       <div class="author-stage-body">
         <div class="author-id-row">
-          <User.Root {ndk} pubkey={data.pubkey} profile={data.profile}>
+          <User.Root {ndk} pubkey={pubkey} profile={profile}>
             <User.Avatar class="profile-avatar author-avatar" />
           </User.Root>
 
