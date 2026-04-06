@@ -251,9 +251,6 @@
 
 {#if currentUser}
   <div class="login-shell">
-    <div class={`status-pill ${needsOnboarding ? 'status-yellow' : 'status-green'}`}>
-      {needsOnboarding ? 'Finish setup' : 'Signed in'}
-    </div>
     <div class="actions">
       <span class="muted">{currentUserLabel}</span>
       {#if needsOnboarding}

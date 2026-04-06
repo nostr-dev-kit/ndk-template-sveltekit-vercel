@@ -39,6 +39,24 @@
   const liveArticles = $derived(mergeUniqueArticles(recentArticles.events, seedArticles, 12));
   const articles = $derived(liveArticles.length > 0 ? liveArticles : seedArticles);
   const activeComments = $derived(discussedComments.events.slice(0, 4));
+  const articleLookup = $derived.by(() => {
+    const lookup = new Map<string, NDKEvent>();
+
+    for (const article of articles) {
+      if (article.id) lookup.set(article.id, article);
+
+      const tagId = article.tagId();
+      if (tagId) lookup.set(tagId, article);
+    }
+
+    return lookup;
+  });
+  const activeCommentCards = $derived(
+    activeComments.map((event) => ({
+      event,
+      article: resolveCommentTargetArticle(event)
+    }))
+  );
   const featuredArticle = $derived.by(() =>
     articles.find((event) => Boolean(articleImageUrl(event.rawEvent())))
   );
@@ -81,11 +99,49 @@
     return merged;
   }
 
+  function commentTargetReference(comment: NDKEvent): string {
+    return (
+      comment.tags.find((tag) => tag[0] === 'a')?.[1]?.trim() ||
+      comment.tags.find((tag) => tag[0] === 'e')?.[1]?.trim() ||
+      ''
+    );
+  }
+
+  function resolveCommentTargetArticle(comment: NDKEvent): NDKEvent | undefined {
+    const reference = commentTargetReference(comment);
+    return reference ? articleLookup.get(reference) : undefined;
+  }
+
 </script>
 
 <section class="lead-grid section">
   {#if featuredArticle && featuredImage}
     <a class="panel story-link-card lead-story reveal" href={`/note/${featuredArticle.encode()}`} use:reveal>
+      <div class="lead-story-copy">
+        <div class="story-kicker-row">
+          <div class="lead-story-badges">
+            <span class="eyebrow eyebrow-blue">Featured</span>
+            {#each featuredTopics as topic (topic)}
+              <span class="lead-story-topic">{topic}</span>
+            {/each}
+          </div>
+
+          <div class="story-pub-meta lead-story-meta">
+            <span>{formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent()))}</span>
+            <span>{articleReadTimeMinutes(featuredArticle.content)} min read</span>
+          </div>
+        </div>
+
+        <div class="lead-story-body">
+          <h1>{articleTitle(featuredArticle.rawEvent())}</h1>
+          <p class="lead-deck">{articleSummary(featuredArticle.rawEvent(), 360)}</p>
+        </div>
+
+        <div class="story-byline">
+          <StoryAuthor {ndk} pubkey={featuredArticle.pubkey} avatarClass="article-author-avatar" />
+        </div>
+      </div>
+
       <div class="lead-story-media">
         <img
           class:loaded={featuredImageLoaded}
@@ -97,28 +153,6 @@
           fetchpriority="high"
           onload={() => (featuredImageLoaded = true)}
         />
-        <div class="lead-story-media-glow"></div>
-
-        <div class="lead-story-badges">
-          <span class="eyebrow eyebrow-blue">Featured</span>
-          {#each featuredTopics as topic (topic)}
-            <span class="lead-story-topic">{topic}</span>
-          {/each}
-        </div>
-      </div>
-
-      <div class="lead-story-copy">
-        <h1>{articleTitle(featuredArticle.rawEvent())}</h1>
-        <p class="lead-deck">{articleSummary(featuredArticle.rawEvent(), 360)}</p>
-
-        <div class="story-byline">
-          <StoryAuthor {ndk} pubkey={featuredArticle.pubkey} avatarClass="article-author-avatar" />
-
-          <div class="story-pub-meta">
-            <span>{formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent()))}</span>
-            <span>{articleReadTimeMinutes(featuredArticle.content)} min read</span>
-          </div>
-        </div>
       </div>
     </a>
   {:else if articles.length > 0}
@@ -136,22 +170,29 @@
 
   <aside class="panel story-rail reveal" style="--index: 1;" use:reveal>
     <div class="section-intro">
-      <h2>Recent comments</h2>
+      <h2 class="home-section-title">Recent comments</h2>
     </div>
 
     <div class="story-rail-list">
-      {#if activeComments.length > 0}
-        {#each activeComments as event, index (event.id)}
-          <a class="rail-story rail-story-comment" href={`/note/${event.encode()}`} style={`--index: ${index};`}>
+      {#if activeCommentCards.length > 0}
+        {#each activeCommentCards as item, index (item.event.id)}
+          <a
+            class="rail-story rail-story-comment"
+            href={`/note/${item.article ? item.article.encode() : item.event.encode()}`}
+            style={`--index: ${index};`}
+          >
             <div class="story-pub-meta">
-              <span>{formatDisplayDate(articlePublishedAt(event.rawEvent()))}</span>
+              <span>{formatDisplayDate(articlePublishedAt(item.event.rawEvent()))}</span>
               <span>Comment</span>
             </div>
-            <p class="rail-comment-body">{noteExcerpt(event.content, 180)}</p>
+            {#if item.article}
+              <h3>{articleTitle(item.article.rawEvent())}</h3>
+            {/if}
+            <p class="rail-comment-body">{noteExcerpt(item.event.content, 180)}</p>
             <div class="story-byline compact">
               <StoryAuthor
                 {ndk}
-                pubkey={event.pubkey}
+                pubkey={item.event.pubkey}
                 avatarClass="article-author-avatar article-author-avatar-compact"
                 compact
               />
@@ -167,7 +208,7 @@
 
 <section class="section" id="reading-stack">
   <div class="section-intro reveal" use:reveal>
-    <h2>More to read</h2>
+    <h2 class="home-section-title">More to read</h2>
   </div>
 
   <div class="story-grid">
@@ -207,7 +248,7 @@
 {#if archiveArticles.length > 0}
   <section class="section reveal" style="--index: 2;" use:reveal>
     <div class="section-intro">
-      <h2>Additional reading</h2>
+      <h2 class="home-section-title">Additional reading</h2>
     </div>
 
     <div class="archive-grid">

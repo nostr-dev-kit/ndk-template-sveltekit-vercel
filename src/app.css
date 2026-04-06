@@ -712,6 +712,12 @@ kbd,
   gap: 0.55rem;
 }
 
+.home-section-title {
+  font-size: clamp(1.15rem, 1.5vw, 1.45rem);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
 .lead-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.9fr);
@@ -720,11 +726,13 @@ kbd,
 }
 
 .lead-story {
+  display: grid;
+  grid-template-columns: minmax(0, 1.02fr) minmax(20rem, 0.98fr);
   gap: 0;
-  min-height: 34rem;
+  min-height: 30rem;
   padding: 0;
   overflow: hidden;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfaf7 100%);
+  background: var(--surface);
 }
 
 .lead-story-empty {
@@ -736,11 +744,9 @@ kbd,
 
 .lead-story-media {
   position: relative;
-  min-height: 20rem;
+  min-height: 100%;
   overflow: hidden;
-  background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.38), transparent 32%),
-    linear-gradient(180deg, #e8e0d2 0%, #d7cfbf 100%);
+  background: #ddd4c4;
 }
 
 .lead-story-image {
@@ -750,8 +756,8 @@ kbd,
   height: 100%;
   object-fit: cover;
   opacity: 0.01;
-  transform: scale(1.08);
-  filter: saturate(0.9) contrast(1.02) blur(12px);
+  transform: scale(1.03);
+  filter: saturate(0.92) contrast(1.01) blur(12px);
   transition:
     opacity 420ms ease,
     transform 900ms cubic-bezier(0.16, 1, 0.3, 1),
@@ -761,35 +767,10 @@ kbd,
 .lead-story-image.loaded {
   opacity: 1;
   transform: scale(1);
-  filter: saturate(1.04) contrast(1.04) blur(0);
-}
-
-.lead-story-media::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(17, 17, 17, 0.12) 100%),
-    linear-gradient(90deg, rgba(17, 17, 17, 0.06) 0%, transparent 38%);
-  pointer-events: none;
-}
-
-.lead-story-media-glow {
-  position: absolute;
-  right: 1.25rem;
-  bottom: -2rem;
-  width: 14rem;
-  height: 14rem;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.24);
-  filter: blur(42px);
-  pointer-events: none;
+  filter: saturate(1.02) contrast(1.03) blur(0);
 }
 
 .lead-story-badges {
-  position: absolute;
-  inset: 1.25rem 1.25rem auto;
-  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
@@ -798,12 +779,11 @@ kbd,
 .lead-story-topic {
   display: inline-flex;
   align-items: center;
-  padding: 0.36rem 0.72rem;
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  padding: 0.38rem 0.74rem;
+  border: 1px solid rgba(17, 17, 17, 0.08);
   border-radius: 9999px;
-  background: rgba(17, 17, 17, 0.34);
-  backdrop-filter: blur(14px);
-  color: #ffffff;
+  background: var(--surface-soft);
+  color: var(--muted);
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -812,31 +792,46 @@ kbd,
 
 .lead-story-copy {
   display: grid;
-  gap: 1.2rem;
-  padding: 1.7rem 1.75rem 1.8rem;
+  align-content: space-between;
+  gap: 1.5rem;
+  padding: 2rem 2rem 2.1rem;
+}
+
+.lead-story-body {
+  display: grid;
+  gap: 1rem;
+}
+
+.lead-story-meta {
+  justify-content: flex-end;
 }
 
 .story-link-card:hover .lead-story-image.loaded {
-  transform: scale(1.04);
+  transform: scale(1.02);
 }
 
 .lead-story h1 {
-  max-width: 12ch;
-  font-size: clamp(2.2rem, 4vw, 3.4rem);
-  line-height: 0.98;
+  max-width: 11ch;
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(2.5rem, 4.4vw, 4.3rem);
+  font-weight: 500;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
 }
 
 .lead-deck {
-  max-width: 42rem;
+  max-width: 34rem;
   margin: 0;
   color: var(--text);
-  font-size: 1.12rem;
+  font-size: 1.08rem;
+  line-height: 1.58;
 }
 
 .story-kicker-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.8rem;
 }
@@ -2345,7 +2340,12 @@ html.js .reveal.is-visible {
     min-height: 22rem;
   }
 
+  .lead-story {
+    grid-template-columns: 1fr;
+  }
+
   .lead-story-media {
+    order: -1;
     min-height: 15rem;
   }
 
@@ -2353,13 +2353,13 @@ html.js .reveal.is-visible {
     padding: 1.25rem;
   }
 
-  .lead-story-badges {
-    inset: 1rem 1rem auto;
+  .lead-story-meta {
+    justify-content: flex-start;
   }
 
   .lead-story h1 {
-    max-width: 10ch;
-    font-size: clamp(1.95rem, 8.5vw, 2.85rem);
+    max-width: 12ch;
+    font-size: clamp(2rem, 8.2vw, 3rem);
   }
 
   .story-byline .story-pub-meta {
