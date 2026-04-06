@@ -17,7 +17,7 @@
 <div class="site-navigation">
   <NavigationMenu.Root class="site-navigation-root">
     <NavigationMenu.List class="site-navigation-list">
-      {#each items as item}
+      {#each items as item (item.href)}
         <NavigationMenu.Item>
           <NavigationMenu.Link
             href={item.href}

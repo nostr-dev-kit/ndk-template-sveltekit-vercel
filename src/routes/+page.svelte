@@ -81,9 +81,6 @@
     return merged;
   }
 
-  function stableEventKey(event: NDKEvent): string {
-    return event.tagId() || event.id || `${event.kind}:${event.pubkey}:${event.created_at ?? 0}`;
-  }
 </script>
 
 <section class="lead-grid section">
@@ -144,7 +141,7 @@
 
     <div class="story-rail-list">
       {#if activeComments.length > 0}
-        {#each activeComments as event, index (stableEventKey(event))}
+        {#each activeComments as event, index (event.id)}
           <a class="rail-story rail-story-comment" href={`/note/${event.encode()}`} style={`--index: ${index};`}>
             <div class="story-pub-meta">
               <span>{formatDisplayDate(articlePublishedAt(event.rawEvent()))}</span>
@@ -175,7 +172,7 @@
 
   <div class="story-grid">
     {#if latestArticles.length > 0}
-      {#each latestArticles as event, index (stableEventKey(event))}
+      {#each latestArticles as event, index (event.id)}
         <a
           class="panel story-link-card story-card reveal"
           href={`/note/${event.encode()}`}
@@ -214,7 +211,7 @@
     </div>
 
     <div class="archive-grid">
-      {#each archiveArticles as event, index (stableEventKey(event))}
+      {#each archiveArticles as event, index (event.id)}
         <a
           class="archive-card story-link-card reveal"
           href={`/note/${event.encode()}`}

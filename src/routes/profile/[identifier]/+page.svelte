@@ -176,7 +176,7 @@
 
       <div class="panel author-feed reveal" style="--index: 1;" use:reveal>
         {#if moreArticles.length > 0}
-          {#each moreArticles as event, index}
+          {#each moreArticles as event, index (event.id)}
             <a
               class="author-feed-row"
               href={`/note/${event.encode()}`}

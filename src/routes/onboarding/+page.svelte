@@ -540,7 +540,7 @@
             </div>
 
             <div class="interest-grid">
-              {#each INTEREST_SUGGESTIONS as interest}
+              {#each INTEREST_SUGGESTIONS as interest (interest)}
                 <button
                   class:active={selectedInterests.includes(interest)}
                   class="interest-chip"
@@ -568,7 +568,7 @@
 
             {#if normalizedInterests.length > 0}
               <div class="topic-row">
-                {#each normalizedInterests as interest}
+                {#each normalizedInterests as interest (interest)}
                   <button class="status-pill status-blue interest-pill" type="button" onclick={() => removeInterest(interest)}>
                     #{interest}
                   </button>
@@ -638,7 +638,7 @@
 
             {#if normalizedInterests.length > 0}
               <div class="topic-row">
-                {#each normalizedInterests.slice(0, 6) as interest}
+                {#each normalizedInterests.slice(0, 6) as interest (interest)}
                   <span class="status-pill status-yellow">#{interest}</span>
                 {/each}
               </div>
