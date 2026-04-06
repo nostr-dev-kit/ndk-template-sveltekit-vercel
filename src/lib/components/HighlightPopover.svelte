@@ -31,29 +31,13 @@
     return full;
   }
 
-  function handleSelectionChange() {
-    if (!containerEl || !currentUser) return;
-
+  function showPopoverForSelection() {
     const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || !selection.toString().trim()) {
-      // Delay hiding to allow clicking the popover
-      setTimeout(() => {
-        const sel = window.getSelection();
-        if (!sel || sel.isCollapsed) {
-          visible = false;
-          showNoteInput = false;
-          noteText = '';
-        }
-      }, 200);
-      return;
-    }
+    if (!selection || selection.isCollapsed || !selection.toString().trim()) return;
+    if (!containerEl) return;
 
-    // Check if selection is within our container
     const range = selection.getRangeAt(0);
-    if (!containerEl.contains(range.commonAncestorContainer)) {
-      visible = false;
-      return;
-    }
+    if (!containerEl.contains(range.commonAncestorContainer)) return;
 
     selectedText = selection.toString().trim();
     contextText = getContext(selection);
@@ -64,11 +48,30 @@
     visible = true;
   }
 
+  function handleMouseUp() {
+    // Small delay so the selection is finalized
+    setTimeout(showPopoverForSelection, 10);
+  }
+
+  function handleDocumentMouseDown(e: MouseEvent) {
+    if (!visible) return;
+    // If clicking inside the popover, don't dismiss
+    const popoverEl = document.querySelector('.highlight-popover');
+    if (popoverEl?.contains(e.target as Node)) return;
+    visible = false;
+    showNoteInput = false;
+    noteText = '';
+  }
+
   $effect(() => {
     if (!containerEl) return;
 
-    document.addEventListener('selectionchange', handleSelectionChange);
-    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+    containerEl.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousedown', handleDocumentMouseDown);
+    return () => {
+      containerEl!.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousedown', handleDocumentMouseDown);
+    };
   });
 
   async function publishHighlight() {
