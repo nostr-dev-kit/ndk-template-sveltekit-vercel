@@ -24,6 +24,11 @@
 
   let { data }: PageProps = $props();
   let activeTab = $state<'article' | 'comments' | 'highlights'>('article');
+  let replyingTo = $state<string | null>(null); // event id being replied to, null = top-level
+  let replyText = $state('');
+  let submitting = $state(false);
+
+  const currentUser = $derived(ndk.$currentUser);
 
   const routeIdentifier = $derived(page.params.id || '');
   const seedEvent = $derived(data.event ? new NDKEvent(ndk, data.event) : undefined);
@@ -203,15 +208,39 @@
     const merged: NDKEvent[] = [];
     const seen = new Set<string>();
 
-    for (const event of [...primary, ...secondary]) {
-      const key = event.id || event.tagId();
+    for (const ev of [...primary, ...secondary]) {
+      const key = ev.id || ev.tagId();
       if (!key || seen.has(key)) continue;
 
       seen.add(key);
-      merged.push(event);
+      merged.push(ev);
     }
 
     return merged;
+  }
+
+  async function submitComment(parentEvent: NDKEvent | null) {
+    if (!currentUser || !replyText.trim() || !event) return;
+
+    submitting = true;
+    try {
+      const root = event;
+      let reply: NDKEvent;
+
+      if (parentEvent) {
+        reply = parentEvent.reply();
+      } else {
+        reply = root.reply();
+      }
+
+      reply.content = replyText.trim();
+      await reply.publish();
+
+      replyText = '';
+      replyingTo = null;
+    } finally {
+      submitting = false;
+    }
   }
 </script>
 
@@ -280,44 +309,107 @@
           </Tabs.Content>
 
           <Tabs.Content value="comments" class="article-tab-panel">
+            <!-- Top-level comment form -->
+            {#if currentUser}
+              {#if replyingTo === null}
+                <div class="comment-compose">
+                  <textarea
+                    class="comment-compose-input"
+                    placeholder="Write a comment…"
+                    bind:value={replyText}
+                    rows="3"
+                  ></textarea>
+                  <div class="comment-compose-actions">
+                    <button
+                      class="button"
+                      disabled={submitting || !replyText.trim()}
+                      onclick={() => submitComment(null)}
+                    >
+                      {submitting ? 'Publishing…' : 'Comment'}
+                    </button>
+                  </div>
+                </div>
+              {/if}
+            {:else}
+              <p class="muted comment-login-prompt">Log in to leave a comment.</p>
+            {/if}
+
             {#if commentTree.length > 0}
               <div class="comment-thread">
                 {#snippet renderComments(nodes: CommentNode[], depth = 0)}
                   {#each nodes as node (node.event.id)}
-                    <article class="comment-card" style={`--comment-depth: ${Math.min(depth, 6)};`}>
-                      <div class="comment-meta">
+                    <div class="comment-node" class:comment-node-nested={depth > 0}>
+                      <div class="comment-header">
                         <User.Root {ndk} pubkey={node.event.pubkey}>
-                          <a class="comment-author-link" href={`/profile/${node.event.pubkey}`}>
-                            <User.Avatar class="article-author-avatar article-author-avatar-compact" />
+                          <a class="comment-avatar-link" href={`/profile/${node.event.pubkey}`}>
+                            <User.Avatar class="article-author-avatar comment-avatar" />
                           </a>
-                          <div class="comment-author-copy">
-                            <div class="feed-meta">
-                              <a class="article-author-name" href={`/profile/${node.event.pubkey}`}>
-                                <User.Name fallback="Commenter" />
-                              </a>
-                              <span>
-                                {node.event.created_at
-                                  ? new Date(node.event.created_at * 1000).toLocaleString()
-                                  : 'Undated'}
-                              </span>
-                            </div>
+                          <div class="comment-header-copy">
+                            <a class="comment-author-name" href={`/profile/${node.event.pubkey}`}>
+                              <User.Name fallback="Commenter" />
+                            </a>
+                            <span class="comment-date">
+                              {node.event.created_at
+                                ? new Date(node.event.created_at * 1000).toLocaleString()
+                                : 'Undated'}
+                            </span>
                           </div>
                         </User.Root>
                       </div>
 
-                      <p class="comment-body">{node.event.content}</p>
+                      <div class="comment-body-wrap">
+                        <p class="comment-body">{node.event.content}</p>
 
-                      {#if node.children.length > 0}
-                        <div class="comment-children">
-                          {@render renderComments(node.children, depth + 1)}
+                        <div class="comment-actions">
+                          {#if currentUser}
+                            <button
+                              class="comment-reply-btn"
+                              onclick={() => {
+                                replyingTo = replyingTo === node.event.id ? null : node.event.id;
+                                replyText = '';
+                              }}
+                            >
+                              {replyingTo === node.event.id ? 'Cancel' : 'Reply'}
+                            </button>
+                          {/if}
                         </div>
-                      {/if}
-                    </article>
+
+                        {#if replyingTo === node.event.id}
+                          <div class="comment-compose comment-compose-inline">
+                            <textarea
+                              class="comment-compose-input"
+                              placeholder="Write a reply…"
+                              bind:value={replyText}
+                              rows="3"
+                            ></textarea>
+                            <div class="comment-compose-actions">
+                              <button
+                                class="button"
+                                disabled={submitting || !replyText.trim()}
+                                onclick={() => submitComment(node.event)}
+                              >
+                                {submitting ? 'Publishing…' : 'Reply'}
+                              </button>
+                            </div>
+                          </div>
+                        {/if}
+
+                        {#if node.children.length > 0}
+                          <div class="comment-children">
+                            {@render renderComments(node.children, depth + 1)}
+                          </div>
+                        {/if}
+                      </div>
+                    </div>
                   {/each}
                 {/snippet}
 
                 {@render renderComments(commentTree)}
               </div>
+            {:else if currentUser === undefined}
+              <!-- still loading -->
+            {:else}
+              <p class="muted" style="margin: 0;">No comments yet. Be the first.</p>
             {/if}
           </Tabs.Content>
 
@@ -356,9 +448,9 @@
 
                     {#if tagValue(highlight.tags, 'context')}
                       <p class="caption" style="margin: 0;">Context: {tagValue(highlight.tags, 'context')}</p>
-                  {/if}
-                </article>
-              {/each}
+                    {/if}
+                  </article>
+                {/each}
               </div>
             {/if}
           </Tabs.Content>
@@ -376,5 +468,166 @@
     margin: 0 auto;
     display: grid;
     gap: 1.35rem;
+  }
+
+  /* ── comment compose ───────────────────────────────────────── */
+
+  .comment-compose {
+    display: grid;
+    gap: 0.65rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .comment-compose-inline {
+    margin-top: 0.75rem;
+    margin-bottom: 0;
+  }
+
+  .comment-compose-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    resize: vertical;
+    transition: border-color 160ms ease;
+  }
+
+  .comment-compose-input:focus {
+    outline: none;
+    border-color: var(--text);
+  }
+
+  .comment-compose-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .comment-login-prompt {
+    margin-bottom: 1.5rem;
+  }
+
+  /* ── comment thread ────────────────────────────────────────── */
+
+  .comment-thread {
+    display: grid;
+    gap: 0;
+  }
+
+  .comment-node {
+    display: grid;
+    grid-template-columns: 2rem 1fr;
+    gap: 0 0.75rem;
+    padding: 1rem 0;
+    border-top: 1px solid var(--border-light);
+  }
+
+  .comment-node:first-child {
+    border-top: none;
+  }
+
+  .comment-node-nested {
+    border-top: none;
+    padding-top: 0.75rem;
+  }
+
+  .comment-header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+  }
+
+  :global(.comment-avatar) {
+    width: 2rem !important;
+    height: 2rem !important;
+  }
+
+  .comment-avatar-link {
+    flex-shrink: 0;
+  }
+
+  .comment-header-copy {
+    display: flex;
+    align-items: baseline;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  .comment-author-name {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text-strong);
+    text-decoration: none;
+  }
+
+  .comment-author-name:hover {
+    color: var(--accent);
+  }
+
+  .comment-date {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  .comment-body-wrap {
+    grid-column: 1 / -1;
+    padding-left: 2.75rem;
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .comment-body {
+    margin: 0;
+    color: var(--text);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .comment-actions {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  .comment-reply-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: color 120ms ease;
+  }
+
+  .comment-reply-btn:hover {
+    color: var(--accent);
+  }
+
+  /* nested indentation via left border line */
+  .comment-children {
+    margin-top: 0.25rem;
+    padding-left: 0;
+    border-left: 2px solid var(--border-light);
+    padding-left: 1rem;
+  }
+
+  .comment-children .comment-node {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-top: none;
+  }
+
+  .comment-children .comment-node + .comment-node {
+    border-top: 1px solid var(--border-light);
   }
 </style>
