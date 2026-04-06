@@ -2,7 +2,9 @@ import NDK, {
   type NDKEvent,
   type NDKFilter,
   type NDKUser,
-  type NDKUserProfile
+  type NDKUserProfile,
+  filterFromId,
+  nip19
 } from '@nostr-dev-kit/ndk';
 import { APP_NAME, DEFAULT_RELAYS } from '$lib/ndk/config';
 
@@ -192,11 +194,7 @@ export async function fetchNoteWithAuthor(identifier: string): Promise<{
   profile?: NDKUserProfile;
 }> {
   const ndk = await getServerNdk();
-  const event = await withTimeout(
-    ndk.fetchEvent(identifier, { closeOnEose: true }),
-    undefined,
-    `fetchNoteWithAuthor(${identifier})`
-  );
+  const event = await fetchEventByIdentifier(ndk, identifier);
   if (!event) return {};
 
   const author = ndk.getUser({ pubkey: event.pubkey });
@@ -210,6 +208,76 @@ export async function fetchNoteWithAuthor(identifier: string): Promise<{
     undefined;
 
   return { event, author, profile };
+}
+
+async function fetchEventByIdentifier(ndk: NDK, identifier: string): Promise<NDKEvent | undefined> {
+  const primaryEvent = await withTimeout(
+    ndk.fetchEvent(identifier, { closeOnEose: true }),
+    null,
+    `fetchNoteWithAuthor(${identifier})`
+  );
+
+  if (primaryEvent) {
+    return primaryEvent;
+  }
+
+  const fallbackEvents = await withTimeout(
+    ndk.fetchEvents([filterFromId(identifier)], { closeOnEose: true }),
+    undefined,
+    `fetchNoteWithAuthor:fallback(${identifier})`
+  );
+
+  const candidates = Array.from(fallbackEvents ?? []);
+  if (candidates.length === 0) {
+    return undefined;
+  }
+
+  return selectMatchingEvent(identifier, candidates);
+}
+
+function selectMatchingEvent(identifier: string, events: NDKEvent[]): NDKEvent | undefined {
+  const normalizedIdentifier = identifier.trim();
+  const addressCandidates = new Set<string>();
+  const eventIdCandidates = new Set<string>();
+
+  if (normalizedIdentifier.includes(':')) {
+    addressCandidates.add(normalizedIdentifier);
+  } else {
+    eventIdCandidates.add(normalizedIdentifier);
+  }
+
+  try {
+    const decoded = nip19.decode(normalizedIdentifier);
+
+    switch (decoded.type) {
+      case 'naddr':
+        addressCandidates.add(`${decoded.data.kind}:${decoded.data.pubkey}:${decoded.data.identifier}`);
+        break;
+      case 'nevent':
+        eventIdCandidates.add(decoded.data.id);
+        break;
+      case 'note':
+        eventIdCandidates.add(decoded.data);
+        break;
+    }
+  } catch {
+    // Invalid or non-bech32 identifiers are already covered above.
+  }
+
+  const exactMatch = events.find((event) => {
+    if (event.id && eventIdCandidates.has(event.id)) {
+      return true;
+    }
+
+    const tagId = event.tagId();
+    return Boolean(tagId && addressCandidates.has(tagId));
+  });
+
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  return [...events].sort(sortByPublishedTime)[0];
 }
 
 export async function fetchArticleComments(event: NDKEvent, limit = 120): Promise<NDKEvent[]> {
