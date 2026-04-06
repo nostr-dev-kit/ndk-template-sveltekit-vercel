@@ -3,6 +3,7 @@
 
   const items = [
     { href: '/', label: 'Read' },
+    { href: '/bookmarks', label: 'Bookmarks' },
     { href: '/about', label: 'About' }
   ];
 

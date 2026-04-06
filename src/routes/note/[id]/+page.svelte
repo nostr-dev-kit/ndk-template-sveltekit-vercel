@@ -21,14 +21,53 @@
   } from '$lib/ndk/format';
   import { ndk } from '$lib/ndk/client';
   import { safeUserIdentifier } from '$lib/ndk/user';
+  import { MarkdownEventContent } from '$lib/ndk/ui/markdown-event-content';
+  import '$lib/ndk/components/mention';
+  import '$lib/ndk/components/embedded-note';
+  import '$lib/ndk/components/embedded-article';
 
   let { data }: PageProps = $props();
   let activeTab = $state<'article' | 'comments' | 'highlights'>('article');
   let replyingTo = $state<string | null>(null); // event id being replied to, null = top-level
   let replyText = $state('');
   let submitting = $state(false);
+  let bookmarking = $state(false);
 
   const currentUser = $derived(ndk.$currentUser);
+
+  const bookmarkList = ndk.$subscribe(() => {
+    if (!browser || !currentUser) return undefined;
+    return {
+      filters: [{ kinds: [10003], authors: [currentUser.pubkey], limit: 1 }]
+    };
+  });
+
+  const isBookmarked = $derived.by(() => {
+    if (!event || !bookmarkList.events[0]) return false;
+    const addr = event.tagId();
+    return bookmarkList.events[0].tags.some((tag) => tag[0] === 'a' && tag[1] === addr);
+  });
+
+  async function toggleBookmark() {
+    if (!currentUser || !event || bookmarking) return;
+    bookmarking = true;
+    try {
+      const addr = event.tagId();
+      const existing = bookmarkList.events[0];
+      const updated = new NDKEvent(ndk);
+      updated.kind = 10003;
+
+      if (existing && isBookmarked) {
+        updated.tags = existing.tags.filter((tag) => !(tag[0] === 'a' && tag[1] === addr));
+      } else {
+        updated.tags = [...(existing?.tags ?? []), ['a', addr]];
+      }
+
+      await updated.publish();
+    } finally {
+      bookmarking = false;
+    }
+  }
 
   const routeIdentifier = $derived(page.params.id || '');
   const seedEvent = $derived(data.event ? new NDKEvent(ndk, data.event) : undefined);
@@ -284,6 +323,20 @@
             {/if}
           </div>
         </User.Root>
+
+        {#if currentUser && isArticle}
+          <button
+            class="bookmark-btn"
+            class:bookmarked={isBookmarked}
+            disabled={bookmarking}
+            title={isBookmarked ? 'Remove bookmark' : 'Bookmark this article'}
+            onclick={toggleBookmark}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill={isBookmarked ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.5">
+              <path d="M5 2h14a1 1 0 0 1 1 1v19.143a.5.5 0 0 1-.766.424L12 18.03l-7.234 4.536A.5.5 0 0 1 4 22.143V3a1 1 0 0 1 1-1z"/>
+            </svg>
+          </button>
+        {/if}
       </div>
 
       <p class="lede" style="margin: 0;">
@@ -358,7 +411,12 @@
                       </div>
 
                       <div class="comment-body-wrap">
-                        <p class="comment-body">{node.event.content}</p>
+                        <MarkdownEventContent
+                          {ndk}
+                          content={node.event.content}
+                          emojiTags={node.event.tags}
+                          class="comment-body"
+                        />
 
                         <div class="comment-actions">
                           {#if currentUser}
@@ -468,6 +526,45 @@
     margin: 0 auto;
     display: grid;
     gap: 1.35rem;
+  }
+
+  /* ── bookmark button ──────────────────────────────────────── */
+
+  .bookmark-btn {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 160ms ease, border-color 160ms ease, background 160ms ease, transform 160ms ease;
+  }
+
+  .bookmark-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .bookmark-btn.bookmarked {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(255, 103, 25, 0.06);
+  }
+
+  .bookmark-btn:active {
+    transform: scale(0.92);
+  }
+
+  .bookmark-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 
   /* ── comment compose ───────────────────────────────────────── */
@@ -583,13 +680,19 @@
     gap: 0.5rem;
   }
 
-  .comment-body {
-    margin: 0;
+  :global(.comment-body) {
     color: var(--text);
     font-size: 0.95rem;
     line-height: 1.6;
-    white-space: pre-wrap;
     overflow-wrap: anywhere;
+  }
+
+  :global(.comment-body p) {
+    margin: 0 0 0.5rem;
+  }
+
+  :global(.comment-body p:last-child) {
+    margin-bottom: 0;
   }
 
   .comment-actions {
