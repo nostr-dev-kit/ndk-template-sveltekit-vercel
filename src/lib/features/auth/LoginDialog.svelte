@@ -121,17 +121,16 @@
       preparingRemoteSigner = true;
 
       const pairing = await prepareRemoteSignerPairing(ndk);
-      nostrConnectSigner = pairing.signer;
+      const activeSigner = pairing.signer;
+      nostrConnectSigner = activeSigner;
       nostrConnectUri = pairing.nostrConnectUri;
       qrCodeDataUrl = pairing.qrCodeDataUrl;
 
-      pairing.signer
-        .blockUntilReady()
+      void ndk.$sessions
+        .login(activeSigner)
         .then(async () => {
-          if (nostrConnectSigner !== pairing.signer || !ndk.$sessions) return;
-
-          await ndk.$sessions.login(pairing.signer);
-          await finishLogin();
+          if (nostrConnectSigner !== activeSigner) return;
+          finishLogin();
         })
         .catch((caught) => {
           if (nostrConnectSigner !== pairing.signer) return;
