@@ -14,6 +14,7 @@
     noteExcerpt,
     formatDisplayDate
   } from '$lib/ndk/format';
+  import { mergeUniqueEvents } from '$lib/ndk/events';
 
   let { data }: PageProps = $props();
 
@@ -35,7 +36,7 @@
   });
 
   const seedArticles = $derived((data.articles ?? []).map((event: NostrEvent) => new NDKEvent(ndk, event)));
-  const liveArticles = $derived(mergeUniqueArticles(recentArticles.events, seedArticles, 12));
+  const liveArticles = $derived(mergeUniqueEvents(recentArticles.events, seedArticles, 12));
   const articles = $derived(liveArticles.length > 0 ? liveArticles : seedArticles);
   const activeComments = $derived(discussedComments.events.slice(0, 6));
   const articleLookup = $derived.by(() => {
@@ -72,25 +73,6 @@
     featuredImage;
     featuredImageLoaded = false;
   });
-
-  function mergeUniqueArticles(primary: NDKEvent[], secondary: NDKEvent[], limit: number): NDKEvent[] {
-    const merged: NDKEvent[] = [];
-    const seen = new Set<string>();
-
-    for (const event of [...primary, ...secondary]) {
-      const key = event.tagId();
-      if (seen.has(key)) continue;
-
-      seen.add(key);
-      merged.push(event);
-
-      if (merged.length >= limit) {
-        break;
-      }
-    }
-
-    return merged;
-  }
 
   function commentTargetReference(comment: NDKEvent): string {
     return (

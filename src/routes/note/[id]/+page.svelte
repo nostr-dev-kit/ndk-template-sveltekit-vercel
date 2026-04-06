@@ -25,6 +25,9 @@
   import '$lib/ndk/components/mention';
   import '$lib/ndk/components/embedded-note';
   import '$lib/ndk/components/embedded-article';
+  import EventAuthorHeader from '$lib/components/EventAuthorHeader.svelte';
+  import BookmarkIcon from '$lib/components/BookmarkIcon.svelte';
+  import { mergeUniqueEvents } from '$lib/ndk/events';
 
   let { data }: PageProps = $props();
   let activeTab = $state<'article' | 'comments' | 'highlights'>('article');
@@ -243,21 +246,6 @@
     return filters;
   }
 
-  function mergeUniqueEvents(primary: NDKEvent[], secondary: NDKEvent[]): NDKEvent[] {
-    const merged: NDKEvent[] = [];
-    const seen = new Set<string>();
-
-    for (const ev of [...primary, ...secondary]) {
-      const key = ev.id || ev.tagId();
-      if (!key || seen.has(key)) continue;
-
-      seen.add(key);
-      merged.push(ev);
-    }
-
-    return merged;
-  }
-
   async function submitComment(parentEvent: NDKEvent | null) {
     if (!currentUser || !replyText.trim() || !event) return;
 
@@ -332,9 +320,7 @@
             title={isBookmarked ? 'Remove bookmark' : 'Bookmark this article'}
             onclick={toggleBookmark}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill={isBookmarked ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.5">
-              <path d="M5 2h14a1 1 0 0 1 1 1v19.143a.5.5 0 0 1-.766.424L12 18.03l-7.234 4.536A.5.5 0 0 1 4 22.143V3a1 1 0 0 1 1-1z"/>
-            </svg>
+            <BookmarkIcon filled={isBookmarked} />
           </button>
         {/if}
       </div>
@@ -393,21 +379,13 @@
                   {#each nodes as node (node.event.id)}
                     <div class="comment-node" class:comment-node-nested={depth > 0}>
                       <div class="comment-header">
-                        <User.Root {ndk} pubkey={node.event.pubkey}>
-                          <a class="comment-avatar-link" href={`/profile/${node.event.pubkey}`}>
-                            <User.Avatar class="article-author-avatar comment-avatar" />
-                          </a>
-                          <div class="comment-header-copy">
-                            <a class="comment-author-name" href={`/profile/${node.event.pubkey}`}>
-                              <User.Name fallback="Commenter" />
-                            </a>
-                            <span class="comment-date">
-                              {node.event.created_at
-                                ? new Date(node.event.created_at * 1000).toLocaleString()
-                                : 'Undated'}
-                            </span>
-                          </div>
-                        </User.Root>
+                        <EventAuthorHeader
+                          {ndk}
+                          pubkey={node.event.pubkey}
+                          timestamp={node.event.created_at}
+                          fallbackName="Commenter"
+                          avatarClass="article-author-avatar comment-avatar"
+                        />
                       </div>
 
                       <div class="comment-body-wrap">
@@ -476,25 +454,12 @@
               <div class="highlight-stack">
                 {#each highlightEvents as highlight (highlight.id)}
                   <article class="highlight-card">
-                    <div class="comment-meta">
-                      <User.Root {ndk} pubkey={highlight.pubkey}>
-                        <a class="comment-author-link" href={`/profile/${highlight.pubkey}`}>
-                          <User.Avatar class="article-author-avatar article-author-avatar-compact" />
-                        </a>
-                        <div class="comment-author-copy">
-                          <div class="feed-meta">
-                            <a class="article-author-name" href={`/profile/${highlight.pubkey}`}>
-                              <User.Name fallback="Reader" />
-                            </a>
-                            <span>
-                              {highlight.created_at
-                                ? new Date(highlight.created_at * 1000).toLocaleString()
-                                : 'Undated'}
-                            </span>
-                          </div>
-                        </div>
-                      </User.Root>
-                    </div>
+                    <EventAuthorHeader
+                      {ndk}
+                      pubkey={highlight.pubkey}
+                      timestamp={highlight.created_at}
+                      fallbackName="Reader"
+                    />
 
                     <blockquote class="highlight-quote">
                       {highlight.content || 'This highlight has no text excerpt.'}
@@ -643,34 +608,6 @@
   :global(.comment-avatar) {
     width: 2rem !important;
     height: 2rem !important;
-  }
-
-  .comment-avatar-link {
-    flex-shrink: 0;
-  }
-
-  .comment-header-copy {
-    display: flex;
-    align-items: baseline;
-    gap: 0.55rem;
-    flex-wrap: wrap;
-    min-width: 0;
-  }
-
-  .comment-author-name {
-    font-size: 0.88rem;
-    font-weight: 700;
-    color: var(--text-strong);
-    text-decoration: none;
-  }
-
-  .comment-author-name:hover {
-    color: var(--accent);
-  }
-
-  .comment-date {
-    font-size: 0.78rem;
-    color: var(--muted);
   }
 
   .comment-body-wrap {

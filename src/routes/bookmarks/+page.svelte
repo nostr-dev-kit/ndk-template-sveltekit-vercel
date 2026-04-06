@@ -1,42 +1,35 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import { NDKEvent, type NostrEvent } from '@nostr-dev-kit/ndk';
+  import { NDKEvent } from '@nostr-dev-kit/ndk';
   import StoryAuthor from '$lib/components/StoryAuthor.svelte';
+  import ArticleCard from '$lib/components/ArticleCard.svelte';
+  import BookmarkIcon from '$lib/components/BookmarkIcon.svelte';
   import { ndk } from '$lib/ndk/client';
   import {
     articleImageUrl,
-    articlePublishedAt,
-    articleReadTimeMinutes,
     articleSummary,
-    articleTitle,
-    formatDisplayDate
+    articleTitle
   } from '$lib/ndk/format';
 
   const currentUser = $derived(ndk.$currentUser);
 
-  // Fetch the current user's bookmark list (kind 10003)
   const myBookmarkList = ndk.$subscribe(() => {
     if (!browser || !currentUser) return undefined;
-
     return {
       filters: [{ kinds: [10003], authors: [currentUser.pubkey], limit: 1 }]
     };
   });
 
-  // Extract article addresses from my bookmarks
   const myBookmarkedAddresses = $derived.by(() => {
     const bookmarkEvent = myBookmarkList.events[0];
     if (!bookmarkEvent) return [];
-
     return bookmarkEvent.tags
       .filter((tag) => tag[0] === 'a' && tag[1]?.startsWith('30023:'))
       .map((tag) => tag[1]);
   });
 
-  // Fetch my bookmarked articles
   const myArticles = ndk.$subscribe(() => {
     if (!browser || myBookmarkedAddresses.length === 0) return undefined;
-
     const filters = myBookmarkedAddresses.map((addr) => {
       const [kind, pubkey, identifier] = addr.split(':');
       return {
@@ -45,27 +38,20 @@
         '#d': [identifier]
       } as import('@nostr-dev-kit/ndk').NDKFilter;
     });
-
     return { filters };
   });
 
-  // Fetch bookmark lists from other people for discovery
   const networkBookmarks = ndk.$subscribe(() => {
     if (!browser) return undefined;
-
     return {
       filters: [{ kinds: [10003], limit: 100 }]
     };
   });
 
-  // Aggregate: count how many people bookmarked each article, sorted by popularity
   const trendingArticleAddresses = $derived.by(() => {
     const counts = new Map<string, { count: number; pubkeys: Set<string> }>();
-
     for (const bookmarkEvent of networkBookmarks.events) {
-      // Skip my own bookmarks from the trending section
       if (currentUser && bookmarkEvent.pubkey === currentUser.pubkey) continue;
-
       for (const tag of bookmarkEvent.tags) {
         if (tag[0] === 'a' && tag[1]?.startsWith('30023:')) {
           const addr = tag[1];
@@ -79,16 +65,13 @@
         }
       }
     }
-
     return [...counts.entries()]
       .sort((a, b) => b[1].count - a[1].count)
       .slice(0, 20);
   });
 
-  // Fetch trending articles
   const trendingArticles = ndk.$subscribe(() => {
     if (!browser || trendingArticleAddresses.length === 0) return undefined;
-
     const filters = trendingArticleAddresses.map(([addr]) => {
       const [kind, pubkey, identifier] = addr.split(':');
       return {
@@ -97,11 +80,9 @@
         '#d': [identifier]
       } as import('@nostr-dev-kit/ndk').NDKFilter;
     });
-
     return { filters };
   });
 
-  // Build lookup for trending articles
   const trendingArticleLookup = $derived.by(() => {
     const lookup = new Map<string, NDKEvent>();
     for (const article of trendingArticles.events) {
@@ -110,27 +91,15 @@
     return lookup;
   });
 
-  // Save counts lookup
-  const saveCounts = $derived.by(() => {
-    const counts = new Map<string, number>();
-    for (const [addr, data] of trendingArticleAddresses) {
-      counts.set(addr, data.count);
-    }
-    return counts;
-  });
-
-  // Ordered trending articles with their save counts
   const orderedTrending = $derived.by(() => {
     return trendingArticleAddresses
       .map(([addr, data]) => ({
         article: trendingArticleLookup.get(addr),
-        saveCount: data.count,
-        savers: data.pubkeys
+        saveCount: data.count
       }))
       .filter((item): item is typeof item & { article: NDKEvent } => Boolean(item.article));
   });
 
-  // My articles ordered by bookmark list order
   const myArticleLookup = $derived.by(() => {
     const lookup = new Map<string, NDKEvent>();
     for (const article of myArticles.events) {
@@ -147,10 +116,8 @@
 
   async function removeBookmark(articleAddress: string) {
     if (!currentUser) return;
-
     const bookmarkEvent = myBookmarkList.events[0];
     if (!bookmarkEvent) return;
-
     const updated = new NDKEvent(ndk);
     updated.kind = 10003;
     updated.tags = bookmarkEvent.tags.filter(
@@ -177,36 +144,13 @@
           <div class="article-feed">
             {#each orderedMyArticles as event (event.id)}
               <div class="bookmark-feed-item">
-                <a class="article-feed-item" href={`/note/${event.encode()}`}>
-                  <div class="article-feed-copy">
-                    <h3 class="article-feed-title">{articleTitle(event.rawEvent())}</h3>
-                    <p class="article-feed-summary">{articleSummary(event.rawEvent(), 180)}</p>
-                    <div class="article-feed-meta">
-                      <StoryAuthor
-                        {ndk}
-                        pubkey={event.pubkey}
-                        avatarClass="article-author-avatar article-author-avatar-compact"
-                        compact
-                      />
-                      <span class="story-pub-meta">
-                        <span>{formatDisplayDate(articlePublishedAt(event.rawEvent()))}</span>
-                        <span>{articleReadTimeMinutes(event.content)} min read</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {#if articleImageUrl(event.rawEvent())}
-                    <img class="article-feed-thumb" src={articleImageUrl(event.rawEvent())} alt="" loading="lazy" />
-                  {/if}
-                </a>
+                <ArticleCard {event} showAuthor />
                 <button
                   class="bookmark-remove-btn"
                   title="Remove from reading list"
                   onclick={() => removeBookmark(event.tagId())}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                    <path d="M5 2h14a1 1 0 0 1 1 1v19.143a.5.5 0 0 1-.766.424L12 18.03l-7.234 4.536A.5.5 0 0 1 4 22.143V3a1 1 0 0 1 1-1z"/>
-                  </svg>
+                  <BookmarkIcon size={16} filled />
                 </button>
               </div>
             {/each}
@@ -216,9 +160,7 @@
         {:else}
           <div class="bookmarks-empty">
             <div class="bookmarks-empty-icon">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M5 2h14a1 1 0 0 1 1 1v19.143a.5.5 0 0 1-.766.424L12 18.03l-7.234 4.536A.5.5 0 0 1 4 22.143V3a1 1 0 0 1 1-1z"/>
-              </svg>
+              <BookmarkIcon size={32} />
             </div>
             <p>Your reading list is empty</p>
             <p class="muted">Bookmark articles to save them here for later</p>
@@ -264,14 +206,10 @@
                     avatarClass="article-author-avatar article-author-avatar-compact"
                     compact
                   />
-                  <div class="trending-card-stats">
-                    <span class="trending-save-count">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                        <path d="M5 2h14a1 1 0 0 1 1 1v19.143a.5.5 0 0 1-.766.424L12 18.03l-7.234 4.536A.5.5 0 0 1 4 22.143V3a1 1 0 0 1 1-1z"/>
-                      </svg>
-                      {saveCount} {saveCount === 1 ? 'save' : 'saves'}
-                    </span>
-                  </div>
+                  <span class="trending-save-count">
+                    <BookmarkIcon size={14} filled />
+                    {saveCount} {saveCount === 1 ? 'save' : 'saves'}
+                  </span>
                 </div>
               </div>
             </a>
@@ -331,64 +269,6 @@
 
   .bookmark-feed-item {
     position: relative;
-  }
-
-  .bookmark-feed-item:first-child .article-feed-item {
-    border-top: 1px solid var(--border-light);
-  }
-
-  .article-feed-item {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 1.5rem;
-    align-items: start;
-    padding: 1.5rem 0;
-    border-bottom: 1px solid var(--border-light);
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .article-feed-copy {
-    display: grid;
-    gap: 0.5rem;
-  }
-
-  .article-feed-title {
-    margin: 0;
-    font-family: var(--font-serif);
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: var(--text-strong);
-    line-height: 1.2;
-    letter-spacing: -0.01em;
-    transition: color 160ms ease;
-  }
-
-  .article-feed-item:hover .article-feed-title {
-    color: var(--accent);
-  }
-
-  .article-feed-summary {
-    margin: 0;
-    color: var(--muted);
-    font-size: 0.95rem;
-    line-height: 1.5;
-    max-width: 48ch;
-  }
-
-  .article-feed-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem;
-    padding-top: 0.25rem;
-  }
-
-  .article-feed-thumb {
-    width: 8rem;
-    aspect-ratio: 4 / 3;
-    object-fit: cover;
-    border-radius: var(--radius-sm);
   }
 
   .bookmark-remove-btn {
@@ -523,12 +403,6 @@
     padding-top: 0.35rem;
   }
 
-  .trending-card-stats {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
   .trending-save-count {
     display: inline-flex;
     align-items: center;
@@ -541,15 +415,6 @@
   /* ── responsive ───────────────────────────────────────────── */
 
   @media (max-width: 720px) {
-    .article-feed-item {
-      grid-template-columns: 1fr;
-    }
-
-    .article-feed-thumb {
-      width: 100%;
-      aspect-ratio: 3 / 2;
-    }
-
     .trending-grid {
       grid-template-columns: 1fr;
     }
