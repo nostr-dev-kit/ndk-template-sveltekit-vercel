@@ -41,7 +41,9 @@
     const counts = new Map<string, number>();
     for (const comment of discussedComments.events) {
       const ref =
+        comment.tags.find((tag) => tag[0] === 'A')?.[1]?.trim() ||
         comment.tags.find((tag) => tag[0] === 'a')?.[1]?.trim() ||
+        comment.tags.find((tag) => tag[0] === 'E')?.[1]?.trim() ||
         comment.tags.find((tag) => tag[0] === 'e')?.[1]?.trim() ||
         '';
       if (ref) counts.set(ref, (counts.get(ref) ?? 0) + 1);
