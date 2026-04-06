@@ -118,9 +118,8 @@
   {#if featuredArticle && featuredImage}
     <a class="panel story-link-card lead-story reveal" href={`/note/${featuredArticle.encode()}`} use:reveal>
       <div class="lead-story-copy">
-        <div class="story-kicker-row">
+        <div class="lead-story-card">
           <div class="lead-story-badges">
-            <span class="eyebrow eyebrow-blue">Featured</span>
             {#each featuredTopics as topic (topic)}
               <span class="lead-story-topic">{topic}</span>
             {/each}
@@ -130,15 +129,15 @@
             <span>{formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent()))}</span>
             <span>{articleReadTimeMinutes(featuredArticle.content)} min read</span>
           </div>
-        </div>
 
-        <div class="lead-story-body">
-          <h1>{articleTitle(featuredArticle.rawEvent())}</h1>
-          <p class="lead-deck">{articleSummary(featuredArticle.rawEvent(), 360)}</p>
-        </div>
+          <div class="lead-story-body">
+            <h1>{articleTitle(featuredArticle.rawEvent())}</h1>
+            <p class="lead-deck">{articleSummary(featuredArticle.rawEvent(), 360)}</p>
+          </div>
 
-        <div class="story-byline">
-          <StoryAuthor {ndk} pubkey={featuredArticle.pubkey} avatarClass="article-author-avatar" />
+          <div class="story-byline">
+            <StoryAuthor {ndk} pubkey={featuredArticle.pubkey} avatarClass="article-author-avatar" />
+          </div>
         </div>
       </div>
 
@@ -167,43 +166,42 @@
       <p class="lead-deck">New writing will appear here as soon as stories are available.</p>
     </article>
   {/if}
+</section>
 
-  <aside class="panel story-rail reveal" style="--index: 1;" use:reveal>
-    <div class="section-intro">
-      <h2 class="home-section-title">Recent comments</h2>
-    </div>
+<section class="section">
+  <div class="section-intro reveal" style="--index: 1;" use:reveal>
+    <h2 class="home-section-title">Recent comments</h2>
+  </div>
 
-    <div class="story-rail-list">
-      {#if activeCommentCards.length > 0}
-        {#each activeCommentCards as item, index (item.event.id)}
-          <a
-            class="rail-story rail-story-comment"
-            href={`/note/${item.article ? item.article.encode() : item.event.encode()}`}
-            style={`--index: ${index};`}
-          >
-            <div class="story-pub-meta">
-              <span>{formatDisplayDate(articlePublishedAt(item.event.rawEvent()))}</span>
-              <span>Comment</span>
-            </div>
-            {#if item.article}
-              <h3>{articleTitle(item.article.rawEvent())}</h3>
-            {/if}
-            <p class="rail-comment-body">{noteExcerpt(item.event.content, 180)}</p>
-            <div class="story-byline compact">
-              <StoryAuthor
-                {ndk}
-                pubkey={item.event.pubkey}
-                avatarClass="article-author-avatar article-author-avatar-compact"
-                compact
-              />
-            </div>
-          </a>
-        {/each}
-      {:else}
-        <p class="muted" style="margin: 0;">No comments yet.</p>
-      {/if}
-    </div>
-  </aside>
+  <div class="comment-grid">
+    {#if activeCommentCards.length > 0}
+      {#each activeCommentCards as item, index (item.event.id)}
+        <a
+          class="panel story-link-card rail-story rail-story-comment reveal"
+          href={`/note/${item.article ? item.article.encode() : item.event.encode()}`}
+          style={`--index: ${index};`}
+          use:reveal
+        >
+          <div class="story-pub-meta">
+            <span>{formatDisplayDate(articlePublishedAt(item.event.rawEvent()))}</span>
+            <span>Comment</span>
+          </div>
+          {#if item.article}
+            <h3>{articleTitle(item.article.rawEvent())}</h3>
+          {/if}
+          <p class="rail-comment-body">{noteExcerpt(item.event.content, 180)}</p>
+          <div class="story-byline compact">
+            <StoryAuthor
+              {ndk}
+              pubkey={item.event.pubkey}
+              avatarClass="article-author-avatar article-author-avatar-compact"
+              compact
+            />
+          </div>
+        </a>
+      {/each}
+    {/if}
+  </div>
 </section>
 
 <section class="section" id="reading-stack">
