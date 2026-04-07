@@ -4,12 +4,14 @@ import NDK, {
   type NDKUser,
   type NDKUserProfile,
   filterFromId,
-  nip19
+  nip19,
+  profileFromEvent
 } from '@nostr-dev-kit/ndk';
 import { APP_NAME, DEFAULT_RELAYS } from '$lib/ndk/config';
 
 const CONNECT_TIMEOUT_MS = 2500;
 const FETCH_TIMEOUT_MS = 2500;
+const FRONT_PAGE_FETCH_TIMEOUT_MS = 6000;
 const FRONT_PAGE_CACHE_TTL_MS = 60_000;
 const clients = new Map<string, Promise<NDK>>();
 let frontPageCache: NDKEvent[] = [];
@@ -80,9 +82,12 @@ export async function fetchRecentNotesByAuthor(pubkey: string, limit = 8): Promi
   return Array.from(events ?? []).sort((left, right) => (right.created_at ?? 0) - (left.created_at ?? 0));
 }
 
-export async function fetchRecentArticles(limit = 10): Promise<NDKEvent[]> {
+export async function fetchRecentArticles(
+  limit = 10,
+  timeoutMs = FETCH_TIMEOUT_MS
+): Promise<NDKEvent[]> {
   const ndk = await getServerNdk();
-  const events = await withTimeout(
+  const events = await withTimeoutMs(
     ndk.fetchEvents(
       {
         kinds: [30023],
@@ -91,14 +96,16 @@ export async function fetchRecentArticles(limit = 10): Promise<NDKEvent[]> {
       { closeOnEose: true }
     ),
     undefined,
-    `fetchRecentArticles(${limit})`
+    `fetchRecentArticles(${limit})`,
+    timeoutMs
   );
 
   return Array.from(events ?? []).sort(sortByPublishedTime);
 }
 
 export async function fetchProfilesByPubkeys(
-  pubkeys: readonly string[]
+  pubkeys: readonly string[],
+  timeoutMs = FRONT_PAGE_FETCH_TIMEOUT_MS
 ): Promise<Record<string, NDKUserProfile>> {
   const uniquePubkeys = [...new Set(pubkeys.map((pubkey) => pubkey.trim()).filter(Boolean))];
 
@@ -107,26 +114,37 @@ export async function fetchProfilesByPubkeys(
   }
 
   const ndk = await getServerNdk();
-  const profiles = await Promise.all(
-    uniquePubkeys.map(async (pubkey) => {
-      const user = ndk.getUser({ pubkey });
-      if (!user.ndk) user.ndk = ndk;
-
-      const profile =
-        user.profile ??
-        (await withTimeout(
-          user.fetchProfile({ closeOnEose: true }).catch(() => null),
-          null,
-          `fetchProfilesByPubkeys:profile(${pubkey})`
-        )) ??
-        undefined;
-
-      return profile ? ([pubkey, profile] as const) : undefined;
-    })
+  const profileEvents = Array.from(
+    (await withTimeoutMs(
+      ndk.fetchEvents(
+        {
+          kinds: [0],
+          authors: uniquePubkeys
+        },
+        { closeOnEose: true }
+      ),
+      undefined,
+      `fetchProfilesByPubkeys(${uniquePubkeys.length})`,
+      timeoutMs
+    )) ?? []
   );
+  const latestProfiles = new Map<string, NDKEvent>();
+
+  for (const event of profileEvents) {
+    const existing = latestProfiles.get(event.pubkey);
+    if (!existing || (event.created_at ?? 0) > (existing.created_at ?? 0)) {
+      latestProfiles.set(event.pubkey, event);
+    }
+  }
 
   return Object.fromEntries(
-    profiles.filter((entry): entry is readonly [string, NDKUserProfile] => Boolean(entry))
+    Array.from(latestProfiles, ([pubkey, event]) => {
+      try {
+        return [pubkey, profileFromEvent(event)] as const;
+      } catch {
+        return undefined;
+      }
+    }).filter((entry): entry is readonly [string, NDKUserProfile] => Boolean(entry))
   );
 }
 
@@ -199,7 +217,19 @@ export async function fetchCommentedArticles(
 }
 
 export async function fetchFrontPageArticles(limit = 10): Promise<NDKEvent[]> {
-  refreshFrontPageArticles(limit);
+  const stale = Date.now() - frontPageCacheUpdatedAt > FRONT_PAGE_CACHE_TTL_MS;
+  const underfilled = frontPageCache.length < limit;
+
+  if (stale || underfilled) {
+    const refresh = refreshFrontPageArticles(limit);
+
+    // SSR needs a real payload on first load; only fall back to background refresh
+    // when we already have enough cached articles to render.
+    if (frontPageCache.length === 0 || underfilled) {
+      await refresh;
+    }
+  }
+
   return frontPageCache.slice(0, limit);
 }
 
@@ -571,6 +601,15 @@ function publishedAtSeconds(event: Pick<NDKEvent, 'created_at' | 'tags'>): numbe
 }
 
 async function withTimeout<T>(promise: Promise<T>, fallback: T, label: string): Promise<T> {
+  return withTimeoutMs(promise, fallback, label, FETCH_TIMEOUT_MS);
+}
+
+async function withTimeoutMs<T>(
+  promise: Promise<T>,
+  fallback: T,
+  label: string,
+  timeoutMs: number
+): Promise<T> {
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
   try {
@@ -578,9 +617,9 @@ async function withTimeout<T>(promise: Promise<T>, fallback: T, label: string): 
       promise,
       new Promise<T>((resolve) => {
         timeoutHandle = setTimeout(() => {
-          console.warn(`${label} timed out after ${FETCH_TIMEOUT_MS}ms`);
+          console.warn(`${label} timed out after ${timeoutMs}ms`);
           resolve(fallback);
-        }, FETCH_TIMEOUT_MS);
+        }, timeoutMs);
       })
     ]);
   } finally {
@@ -588,18 +627,11 @@ async function withTimeout<T>(promise: Promise<T>, fallback: T, label: string): 
   }
 }
 
-function refreshFrontPageArticles(limit: number): void {
-  if (frontPageRefresh) return;
-
-  const stale = Date.now() - frontPageCacheUpdatedAt > FRONT_PAGE_CACHE_TTL_MS;
-  const underfilled = frontPageCache.length < limit;
-
-  if (!stale && !underfilled) {
-    return;
-  }
+function refreshFrontPageArticles(limit: number): Promise<void> {
+  if (frontPageRefresh) return frontPageRefresh;
 
   frontPageRefresh = (async () => {
-    const events = await fetchRecentArticles(limit);
+    const events = await fetchRecentArticles(limit, FRONT_PAGE_FETCH_TIMEOUT_MS);
 
     if (events.length > 0 || frontPageCache.length === 0) {
       frontPageCache = events;
@@ -612,4 +644,6 @@ function refreshFrontPageArticles(limit: number): void {
     .finally(() => {
       frontPageRefresh = undefined;
     });
+
+  return frontPageRefresh;
 }
