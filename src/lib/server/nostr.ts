@@ -1,3 +1,4 @@
+import { dev } from '$app/environment';
 import NDK, {
   type NDKEvent,
   type NDKFilter,
@@ -13,6 +14,7 @@ const CONNECT_TIMEOUT_MS = 2500;
 const FETCH_TIMEOUT_MS = 2500;
 const FRONT_PAGE_FETCH_TIMEOUT_MS = 6000;
 const FRONT_PAGE_CACHE_TTL_MS = 60_000;
+const FRONT_PAGE_CACHE_LOG_PREFIX = '[front-page-cache]';
 const clients = new Map<string, Promise<NDK>>();
 let frontPageCache: NDKEvent[] = [];
 let frontPageCacheUpdatedAt = 0;
@@ -220,17 +222,75 @@ export async function fetchFrontPageArticles(limit = 10): Promise<NDKEvent[]> {
   const stale = Date.now() - frontPageCacheUpdatedAt > FRONT_PAGE_CACHE_TTL_MS;
   const underfilled = frontPageCache.length < limit;
 
+  logFrontPageCache('fetch', {
+    limit,
+    stale,
+    underfilled,
+    cacheSize: frontPageCache.length,
+    cacheAgeMs: frontPageCacheUpdatedAt ? Date.now() - frontPageCacheUpdatedAt : null
+  });
+
   if (stale || underfilled) {
     const refresh = refreshFrontPageArticles(limit);
 
     // SSR needs a real payload on first load; only fall back to background refresh
     // when we already have enough cached articles to render.
     if (frontPageCache.length === 0 || underfilled) {
+      logFrontPageCache('await-refresh', { limit, cacheSize: frontPageCache.length });
       await refresh;
     }
   }
 
   return frontPageCache.slice(0, limit);
+}
+
+export async function inspectFrontPageCache(options?: {
+  limit?: number;
+  refresh?: boolean;
+}): Promise<{
+  limit: number;
+  ttlMs: number;
+  cacheSize: number;
+  cacheAgeMs: number | null;
+  updatedAt: number | null;
+  updatedAtIso: string | null;
+  stale: boolean;
+  refreshInFlight: boolean;
+  entries: Array<{
+    id: string;
+    tagId: string;
+    pubkey: string;
+    kind: number;
+    createdAt: number | null;
+    createdAtIso: string | null;
+  }>;
+}> {
+  const limit = Math.max(1, options?.limit ?? 12);
+
+  if (options?.refresh) {
+    await refreshFrontPageArticles(limit);
+  }
+
+  const cacheAgeMs = frontPageCacheUpdatedAt ? Date.now() - frontPageCacheUpdatedAt : null;
+
+  return {
+    limit,
+    ttlMs: FRONT_PAGE_CACHE_TTL_MS,
+    cacheSize: frontPageCache.length,
+    cacheAgeMs,
+    updatedAt: frontPageCacheUpdatedAt || null,
+    updatedAtIso: frontPageCacheUpdatedAt ? new Date(frontPageCacheUpdatedAt).toISOString() : null,
+    stale: cacheAgeMs === null ? true : cacheAgeMs > FRONT_PAGE_CACHE_TTL_MS,
+    refreshInFlight: Boolean(frontPageRefresh),
+    entries: frontPageCache.slice(0, limit).map((event) => ({
+      id: event.id,
+      tagId: event.tagId(),
+      pubkey: event.pubkey,
+      kind: event.kind,
+      createdAt: event.created_at ?? null,
+      createdAtIso: event.created_at ? new Date(event.created_at * 1000).toISOString() : null
+    }))
+  };
 }
 
 export async function fetchRecentArticlesByAuthor(pubkey: string, limit = 8): Promise<NDKEvent[]> {
@@ -631,19 +691,40 @@ function refreshFrontPageArticles(limit: number): Promise<void> {
   if (frontPageRefresh) return frontPageRefresh;
 
   frontPageRefresh = (async () => {
+    logFrontPageCache('refresh-start', { limit });
     const events = await fetchRecentArticles(limit, FRONT_PAGE_FETCH_TIMEOUT_MS);
 
     if (events.length > 0 || frontPageCache.length === 0) {
       frontPageCache = events;
       frontPageCacheUpdatedAt = Date.now();
     }
+
+    logFrontPageCache('refresh-complete', {
+      limit,
+      fetched: events.length,
+      cacheSize: frontPageCache.length,
+      updatedAt: frontPageCacheUpdatedAt || null
+    });
   })()
     .catch((error) => {
       console.warn('front page cache refresh failed', error);
+      logFrontPageCache('refresh-error', {
+        limit,
+        error: error instanceof Error ? error.message : String(error)
+      });
     })
     .finally(() => {
       frontPageRefresh = undefined;
     });
 
   return frontPageRefresh;
+}
+
+function logFrontPageCache(event: string, payload: Record<string, unknown>): void {
+  if (!dev) return;
+
+  console.info(FRONT_PAGE_CACHE_LOG_PREFIX, event, {
+    at: new Date().toISOString(),
+    ...payload
+  });
 }
