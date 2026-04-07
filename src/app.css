@@ -1490,6 +1490,32 @@ html.js .reveal.is-visible {
 }
 
 @media (max-width: 720px) {
+  .topbar-inner {
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    padding: 0.65rem 0;
+  }
+
+  .brand {
+    flex: 1;
+  }
+
+  .site-navigation {
+    order: 3;
+    width: 100%;
+    gap: 0;
+    border-top: 1px solid var(--border-light);
+    padding-top: 0.4rem;
+    margin-top: 0;
+  }
+
+  .site-navigation-link {
+    flex: 1;
+    text-align: center;
+    padding: 0.4rem 0.3rem;
+    font-size: 0.82rem;
+  }
+
   .ob-shell {
     padding: 2rem 0 4rem;
   }

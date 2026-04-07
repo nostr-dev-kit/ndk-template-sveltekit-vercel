@@ -274,32 +274,25 @@
 
 @media (max-width: 720px) {
   .auth-panel {
-    width: 100%;
-    justify-items: stretch;
+    justify-items: end;
   }
 
   .auth-actions,
   .auth-guest-actions {
-    display: grid;
-    width: 100%;
-    grid-template-columns: 1fr;
-  }
-
-  .auth-panel-user {
-    justify-items: stretch;
-  }
-
-  .auth-user-trigger {
-    width: 100%;
-  }
-
-  .auth-user-meta {
-    display: none;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
   }
 
   .auth-join,
   .auth-trigger {
-    width: 100%;
+    min-width: auto;
+    padding: 0 0.85rem;
+    font-size: 0.85rem;
+  }
+
+  .auth-user-meta {
+    display: none;
   }
 
   .auth-dialog-chrome {
