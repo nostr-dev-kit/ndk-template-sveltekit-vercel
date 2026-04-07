@@ -2,6 +2,10 @@ import type { NDKUserProfile, NostrEvent } from '@nostr-dev-kit/ndk';
 
 type EventWithContent = Pick<NostrEvent, 'content' | 'tags'>;
 type EventWithTiming = Pick<NostrEvent, 'content' | 'tags' | 'created_at'>;
+type LooseUserProfile = NDKUserProfile & {
+  display_name?: string;
+  username?: string;
+};
 
 export function shortPubkey(pubkey: string): string {
   if (pubkey.length <= 16) return pubkey;
@@ -11,7 +15,9 @@ export function shortPubkey(pubkey: string): string {
 export function displayName(profile: NDKUserProfile | undefined, fallback: string): string {
   const candidate =
     cleanText(profile?.displayName) ||
+    cleanText((profile as LooseUserProfile | undefined)?.display_name) ||
     cleanText(profile?.name) ||
+    cleanText((profile as LooseUserProfile | undefined)?.username) ||
     displayNip05(profile) ||
     fallback;
 

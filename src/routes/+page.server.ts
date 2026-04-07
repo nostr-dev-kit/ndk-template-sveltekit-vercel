@@ -1,7 +1,7 @@
 import type { NostrEvent } from '@nostr-dev-kit/ndk';
 import type { PageServerLoad } from './$types';
 import { buildHomeSeo } from '$lib/seo';
-import { fetchFrontPageArticles } from '$lib/server/nostr';
+import { fetchFrontPageArticles, fetchProfilesByPubkeys } from '$lib/server/nostr';
 
 export const load: PageServerLoad = async ({ setHeaders, url }) => {
   setHeaders({
@@ -10,9 +10,11 @@ export const load: PageServerLoad = async ({ setHeaders, url }) => {
 
   try {
     const articles = await fetchFrontPageArticles(12);
+    const profiles = await fetchProfilesByPubkeys(articles.map((event) => event.pubkey));
 
     return {
       articles: articles.map((event) => event.rawEvent() as NostrEvent),
+      profiles,
       seo: buildHomeSeo(url)
     };
   } catch (error) {
@@ -20,6 +22,7 @@ export const load: PageServerLoad = async ({ setHeaders, url }) => {
 
     return {
       articles: [],
+      profiles: {},
       seo: buildHomeSeo(url)
     };
   }

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import type { NDKEvent } from '@nostr-dev-kit/ndk';
+  import type { NDKEvent, NDKUserProfile } from '@nostr-dev-kit/ndk';
   import { ndk } from '$lib/ndk/client';
   import StoryAuthor from '$lib/components/StoryAuthor.svelte';
   import {
@@ -12,7 +12,15 @@
     formatDisplayDate
   } from '$lib/ndk/format';
 
-  let { event, showAuthor = false }: { event: NDKEvent; showAuthor?: boolean } = $props();
+  let {
+    event,
+    showAuthor = false,
+    authorProfile
+  }: {
+    event: NDKEvent;
+    showAuthor?: boolean;
+    authorProfile?: NDKUserProfile;
+  } = $props();
 
   const comments = ndk.$subscribe(() => {
     if (!browser) return undefined;
@@ -26,7 +34,13 @@
     <p class="article-feed-summary">{articleSummary(event.rawEvent(), 180)}</p>
     <div class="article-feed-meta">
       {#if showAuthor}
-        <StoryAuthor {ndk} pubkey={event.pubkey} avatarClass="article-author-avatar article-author-avatar-compact" compact />
+        <StoryAuthor
+          {ndk}
+          pubkey={event.pubkey}
+          profile={authorProfile}
+          avatarClass="article-author-avatar article-author-avatar-compact"
+          compact
+        />
       {/if}
       <span class="story-pub-meta">
         <span>{formatDisplayDate(articlePublishedAt(event.rawEvent()))}</span>

@@ -97,6 +97,39 @@ export async function fetchRecentArticles(limit = 10): Promise<NDKEvent[]> {
   return Array.from(events ?? []).sort(sortByPublishedTime);
 }
 
+export async function fetchProfilesByPubkeys(
+  pubkeys: readonly string[]
+): Promise<Record<string, NDKUserProfile>> {
+  const uniquePubkeys = [...new Set(pubkeys.map((pubkey) => pubkey.trim()).filter(Boolean))];
+
+  if (uniquePubkeys.length === 0) {
+    return {};
+  }
+
+  const ndk = await getServerNdk();
+  const profiles = await Promise.all(
+    uniquePubkeys.map(async (pubkey) => {
+      const user = ndk.getUser({ pubkey });
+      if (!user.ndk) user.ndk = ndk;
+
+      const profile =
+        user.profile ??
+        (await withTimeout(
+          user.fetchProfile({ closeOnEose: true }).catch(() => null),
+          null,
+          `fetchProfilesByPubkeys:profile(${pubkey})`
+        )) ??
+        undefined;
+
+      return profile ? ([pubkey, profile] as const) : undefined;
+    })
+  );
+
+  return Object.fromEntries(
+    profiles.filter((entry): entry is readonly [string, NDKUserProfile] => Boolean(entry))
+  );
+}
+
 export async function fetchCommentedArticles(
   limit = 10,
   pointerLimit = Math.max(limit * 8, 48)

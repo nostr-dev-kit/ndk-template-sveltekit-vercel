@@ -108,7 +108,13 @@
             <h1 class="featured-story-title">{featuredTitle}</h1>
             <p class="featured-story-summary">{articleSummary(featuredArticle.rawEvent(), 280)}</p>
             <div class="featured-story-meta">
-              <StoryAuthor {ndk} pubkey={featuredArticle.pubkey} avatarClass="article-author-avatar article-author-avatar-compact" compact />
+              <StoryAuthor
+                {ndk}
+                pubkey={featuredArticle.pubkey}
+                profile={data.profiles?.[featuredArticle.pubkey]}
+                avatarClass="article-author-avatar article-author-avatar-compact"
+                compact
+              />
               <span class="story-pub-meta">
                 <span>{formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent()))}</span>
                 <span>{articleReadTimeMinutes(featuredArticle.content)} min read</span>
@@ -132,7 +138,7 @@
     {#if feedArticles.length > 0}
       <section class="article-feed">
         {#each feedArticles as event (event.id)}
-          <ArticleCard {event} showAuthor />
+          <ArticleCard {event} authorProfile={data.profiles?.[event.pubkey]} showAuthor />
         {/each}
       </section>
     {/if}
