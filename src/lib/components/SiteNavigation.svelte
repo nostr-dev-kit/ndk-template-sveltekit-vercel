@@ -5,8 +5,7 @@
     { href: '/', label: 'Read' },
     { href: '/highlights', label: 'Highlights' },
     { href: '/bookmarks', label: 'Bookmarks' },
-    { href: '/relays', label: 'Relays' },
-    { href: '/about', label: 'About' }
+    { href: '/relays', label: 'Relays' }
   ];
 
   function isActive(href: string): boolean {
