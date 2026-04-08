@@ -1,125 +1,53 @@
 <script lang="ts">
-  import type { PageProps } from './$types';
   import { browser } from '$app/environment';
-  import { NDKEvent, type NostrEvent } from '@nostr-dev-kit/ndk';
+  import { NDKEvent } from '@nostr-dev-kit/ndk';
   import StoryAuthor from '$lib/components/StoryAuthor.svelte';
   import { ndk } from '$lib/ndk/client';
   import { articleTitle, articleSummary, noteExcerpt } from '$lib/ndk/format';
-  import { mergeUniqueEvents } from '$lib/ndk/events';
 
-  let { data }: PageProps = $props();
-
-  const liveHighlights = ndk.$subscribe(() => {
+  // Subscribe to recent highlights; meta-subscription resolves the articles they point to
+  const highlightedArticles = ndk.$metaSubscribe(() => {
     if (!browser) return undefined;
-    return { filters: [{ kinds: [9802], limit: 100 }] };
+    return {
+      filters: [{ kinds: [9802], limit: 100 }],
+      sort: 'unique-authors'
+    };
   });
 
-  const seedHighlights = $derived(
-    (data.highlights ?? []).map((e: NostrEvent) => new NDKEvent(ndk, e))
-  );
-  const seedArticles = $derived(
-    (data.articles ?? []).map((e: NostrEvent) => new NDKEvent(ndk, e))
-  );
-
-  const highlights = $derived(
-    mergeUniqueEvents(liveHighlights.events, seedHighlights, 200)
-      .toSorted((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0))
-  );
-
-  const articleLookup = $derived.by(() => {
-    const lookup = new Map<string, NDKEvent>();
-    for (const article of seedArticles) {
-      if (article.id) lookup.set(article.id, article);
-      const tagId = article.tagId();
-      if (tagId) lookup.set(tagId, article);
-    }
-    return lookup;
-  });
-
-  function highlightArticleRef(highlight: NDKEvent): string {
-    return (
-      highlight.tags.find((t) => t[0] === 'a')?.[1]?.trim() ||
-      highlight.tags.find((t) => t[0] === 'e')?.[1]?.trim() ||
-      ''
-    );
+  function articleHighlights(article: NDKEvent): NDKEvent[] {
+    return highlightedArticles.eventsTagging(article);
   }
 
-  type ArticleEntry = {
-    article: NDKEvent;
-    ref: string;
-    highlights: NDKEvent[];
-    uniqueHighlighters: number;
-    bestQuote: string;
-    latestHighlightTime: number;
-  };
+  function bestQuote(article: NDKEvent): string {
+    const highlights = articleHighlights(article);
+    if (!highlights.length) return '';
 
-  const articleEntries = $derived.by(() => {
-    // Group highlights by article reference
-    const byArticle = new Map<string, NDKEvent[]>();
+    const contentCounts = new Map<string, number>();
     for (const h of highlights) {
-      const ref = highlightArticleRef(h);
-      if (!ref) continue;
-      const list = byArticle.get(ref) ?? [];
-      list.push(h);
-      byArticle.set(ref, list);
+      const content = h.content.trim();
+      if (!content) continue;
+      contentCounts.set(content, (contentCounts.get(content) ?? 0) + 1);
     }
 
-    // Build article entries
-    const entries: ArticleEntry[] = [];
-    for (const [ref, articleHighlights] of byArticle) {
-      const article = articleLookup.get(ref);
-      if (!article) continue;
-
-      const highlighters = new Set(articleHighlights.map((h) => h.pubkey));
-
-      // Find the most-repeated content (popular passage)
-      const contentCounts = new Map<string, number>();
-      for (const h of articleHighlights) {
-        const content = h.content.trim();
-        if (!content) continue;
-        contentCounts.set(content, (contentCounts.get(content) ?? 0) + 1);
+    let quote = '';
+    let bestCount = 0;
+    for (const [content, count] of contentCounts) {
+      if (count > bestCount || (count === bestCount && content.length > quote.length)) {
+        quote = content;
+        bestCount = count;
       }
-
-      let bestQuote = '';
-      let bestCount = 0;
-      for (const [content, count] of contentCounts) {
-        if (count > bestCount || (count === bestCount && content.length > bestQuote.length)) {
-          bestQuote = content;
-          bestCount = count;
-        }
-      }
-
-      if (!bestQuote && articleHighlights.length > 0) {
-        bestQuote = articleHighlights[0].content.trim();
-      }
-
-      entries.push({
-        article,
-        ref,
-        highlights: articleHighlights,
-        uniqueHighlighters: highlighters.size,
-        bestQuote,
-        latestHighlightTime: Math.max(...articleHighlights.map((h) => h.created_at ?? 0))
-      });
     }
+    return quote || highlights[0].content.trim();
+  }
 
-    // Sort by number of unique highlighters desc, then by recency
-    return entries.sort((a, b) => {
-      if (b.uniqueHighlighters !== a.uniqueHighlighters) {
-        return b.uniqueHighlighters - a.uniqueHighlighters;
-      }
-      return b.latestHighlightTime - a.latestHighlightTime;
-    });
-  });
+  function uniqueHighlighters(article: NDKEvent): number {
+    return new Set(articleHighlights(article).map((h) => h.pubkey)).size;
+  }
 
-  const heroEntry = $derived(articleEntries[0] ?? null);
-  const gridEntries = $derived(articleEntries.slice(1));
-  const sidebarEntries = $derived(articleEntries.slice(0, 8));
-
-  function sampleQuotes(entry: ArticleEntry, max: number): string[] {
+  function sampleQuotes(article: NDKEvent, max: number): string[] {
     const seen = new Set<string>();
     const quotes: string[] = [];
-    for (const h of entry.highlights) {
+    for (const h of articleHighlights(article)) {
       const content = h.content.trim();
       if (!content || seen.has(content)) continue;
       seen.add(content);
@@ -128,27 +56,32 @@
     }
     return quotes;
   }
+
+  const entries = $derived(highlightedArticles.events);
+  const heroEntry = $derived(entries[0] ?? null);
+  const gridEntries = $derived(entries.slice(1));
+  const sidebarEntries = $derived(entries.slice(0, 8));
 </script>
 
 <div class="hl-page">
   {#if heroEntry}
     <section class="hl-hero">
-      <a class="hl-hero-card" href={`/note/${heroEntry.article.encode()}`}>
+      <a class="hl-hero-card" href={`/note/${heroEntry.encode()}`}>
         <blockquote class="hl-hero-quote">
-          {noteExcerpt(heroEntry.bestQuote, 500)}
+          {noteExcerpt(bestQuote(heroEntry), 500)}
         </blockquote>
         <div class="hl-hero-info">
-          <span class="hl-hero-title">{articleTitle(heroEntry.article.rawEvent())}</span>
+          <span class="hl-hero-title">{articleTitle(heroEntry.rawEvent())}</span>
           <div class="hl-hero-byline">
             <StoryAuthor
               {ndk}
-              pubkey={heroEntry.article.pubkey}
+              pubkey={heroEntry.pubkey}
               avatarClass="article-author-avatar article-author-avatar-compact"
               compact
             />
             <span class="hl-badge">
-              {heroEntry.highlights.length} highlight{heroEntry.highlights.length === 1 ? '' : 's'}
-              · {heroEntry.uniqueHighlighters} reader{heroEntry.uniqueHighlighters === 1 ? '' : 's'}
+              {articleHighlights(heroEntry).length} highlight{articleHighlights(heroEntry).length === 1 ? '' : 's'}
+              · {uniqueHighlighters(heroEntry)} reader{uniqueHighlighters(heroEntry) === 1 ? '' : 's'}
             </span>
           </div>
         </div>
@@ -158,25 +91,26 @@
 
   <div class="hl-body">
     <div class="hl-main">
-      {#if gridEntries.length === 0 && !heroEntry}
+      {#if entries.length === 0}
         <p class="muted">No highlights yet.</p>
       {:else}
         <div class="hl-grid">
-          {#each gridEntries as entry, i (entry.ref)}
+          {#each gridEntries as article, i (article.tagId())}
             {@const isWide = i % 3 === 0}
-            {@const quotes = sampleQuotes(entry, isWide ? 3 : 2)}
+            {@const quotes = sampleQuotes(article, isWide ? 3 : 2)}
+            {@const hlCount = articleHighlights(article).length}
             <a
               class="hl-card"
               class:hl-card-wide={isWide}
-              href={`/note/${entry.article.encode()}`}
+              href={`/note/${article.encode()}`}
             >
               <div class="hl-card-header">
-                <span class="hl-card-title">{articleTitle(entry.article.rawEvent())}</span>
-                <p class="hl-card-summary">{articleSummary(entry.article.rawEvent(), 120)}</p>
+                <span class="hl-card-title">{articleTitle(article.rawEvent())}</span>
+                <p class="hl-card-summary">{articleSummary(article.rawEvent(), 120)}</p>
                 <div class="hl-card-byline">
                   <StoryAuthor
                     {ndk}
-                    pubkey={entry.article.pubkey}
+                    pubkey={article.pubkey}
                     avatarClass="article-author-avatar article-author-avatar-compact"
                     compact
                   />
@@ -193,10 +127,10 @@
 
               <div class="hl-card-footer">
                 <span class="hl-badge">
-                  {entry.highlights.length} highlight{entry.highlights.length === 1 ? '' : 's'}
+                  {hlCount} highlight{hlCount === 1 ? '' : 's'}
                 </span>
                 <span class="hl-readers">
-                  {entry.uniqueHighlighters} reader{entry.uniqueHighlighters === 1 ? '' : 's'}
+                  {uniqueHighlighters(article)} reader{uniqueHighlighters(article) === 1 ? '' : 's'}
                 </span>
               </div>
             </a>
@@ -209,17 +143,23 @@
       <aside class="hl-sidebar">
         <span class="hl-sidebar-heading">Most highlighted</span>
         <div class="hl-sidebar-list">
-          {#each sidebarEntries as entry (entry.ref)}
-            <a class="hl-sidebar-item" href={`/note/${entry.article.encode()}`}>
-              <span class="hl-sidebar-title">{articleTitle(entry.article.rawEvent())}</span>
+          {#each sidebarEntries as article (article.tagId())}
+            <a class="hl-sidebar-item" href={`/note/${article.encode()}`}>
+              <blockquote class="hl-sidebar-quote">
+                {noteExcerpt(bestQuote(article), 100)}
+              </blockquote>
+              <span class="hl-sidebar-title">{articleTitle(article.rawEvent())}</span>
               <div class="hl-sidebar-meta">
-                <StoryAuthor
-                  {ndk}
-                  pubkey={entry.article.pubkey}
-                  avatarClass="article-author-avatar article-author-avatar-compact"
-                  compact
-                />
-                <span class="hl-badge">{entry.highlights.length}</span>
+                <span class="hl-sidebar-author">
+                  <StoryAuthor
+                    {ndk}
+                    pubkey={article.pubkey}
+                    avatarClass="article-author-avatar article-author-avatar-compact"
+                    compact
+                  />
+                </span>
+                <span class="hl-sidebar-dot">·</span>
+                <span class="hl-sidebar-count">{articleHighlights(article).length} highlights</span>
               </div>
             </a>
           {/each}
@@ -426,7 +366,7 @@
 
   .hl-sidebar-item {
     display: grid;
-    gap: 0.45rem;
+    gap: 0.4rem;
     padding: 0.85rem 0;
     border-bottom: 1px solid var(--border-light);
     color: inherit;
@@ -441,16 +381,30 @@
     border-bottom: none;
   }
 
-  .hl-sidebar-title {
-    font-size: 0.88rem;
-    font-weight: 600;
-    color: var(--text-strong);
-    line-height: 1.35;
+  .hl-sidebar-quote {
+    margin: 0;
+    padding: 0.45rem 0.6rem;
+    border-left: 2px solid rgba(31, 108, 159, 0.3);
+    background: var(--surface-soft);
+    color: var(--text);
+    font-family: var(--font-serif);
+    font-size: 0.8rem;
+    line-height: 1.45;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  .hl-sidebar-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-strong);
+    line-height: 1.3;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     transition: color 160ms ease;
   }
 
@@ -460,9 +414,37 @@
 
   .hl-sidebar-meta {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.3rem;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .hl-sidebar-author {
+    min-width: 0;
+  }
+
+  .hl-sidebar-author :global(.registry-user-avatar),
+  .hl-sidebar-author :global(.story-author-handle) {
+    display: none;
+  }
+
+  .hl-sidebar-author :global(.story-author-link) {
+    gap: 0;
+  }
+
+  .hl-sidebar-author :global(.story-author-name) {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  .hl-sidebar-dot {
+    color: var(--border);
+  }
+
+  .hl-sidebar-count {
+    white-space: nowrap;
   }
 
   /* ── responsive ─────────────────────────────────────────────── */

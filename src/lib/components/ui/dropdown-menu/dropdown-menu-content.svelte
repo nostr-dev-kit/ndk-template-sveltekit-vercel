@@ -28,6 +28,7 @@
   :global(.dropdown-menu-content) {
     z-index: 40;
     min-width: 14rem;
+    overflow: hidden;
     border: 1px solid rgba(17, 17, 17, 0.08);
     border-radius: 1.1rem;
     background:
