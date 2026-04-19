@@ -9,6 +9,7 @@ The included UI uses profiles, notes, articles, comments, and highlights to show
 ## What You Get
 
 - SSR that works for crawlers, links, and real users
+- optional Upstash/Vercel KV-backed NDK cache for SSR event reads
 - live client updates layered on top of server-rendered pages
 - built-in SEO and social previews, including dynamic OG images
 - login flows for common Nostr signer setups
@@ -65,6 +66,26 @@ PUBLIC_NOSTR_RELAYS=wss://relay.damus.io,wss://purplepag.es,wss://relay.primal.n
 
 If omitted, the template uses those three relays by default.
 
+To let SSR loads serve Nostr events from a durable Vercel-friendly cache, add
+Upstash Redis REST credentials:
+
+```bash
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+```
+
+Vercel KV's `KV_REST_API_URL` and `KV_REST_API_TOKEN` names are also supported.
+The SSR cache uses `@nostr-dev-kit/cache-upstash`, stores under the
+`sveltekit-vercel-ndk:ssr:v1` namespace by default, and falls back to relay
+fetches when the cache is missing or not configured.
+
+Optional cache tuning:
+
+```bash
+NDK_SSR_CACHE_NAMESPACE=
+NDK_SSR_CACHE_TTL_SECONDS=3600
+```
+
 To enable managed NIP-05 registration in onboarding, add:
 
 ```bash
@@ -87,9 +108,10 @@ Without those two variables, the template falls back to an in-memory registry th
 1. Import the project into Vercel.
 2. Leave the framework preset on `SvelteKit`.
 3. Add `PUBLIC_NOSTR_RELAYS` if you want custom relays.
-4. Add `PUBLIC_NIP05_DOMAIN` if you want the template to issue handles for your domain.
-5. Add `KV_REST_API_URL` and `KV_REST_API_TOKEN` if you want those handle registrations to persist across instances.
-6. Deploy.
+4. Add `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` for durable SSR NDK caching. Vercel KV's `KV_REST_API_URL` and `KV_REST_API_TOKEN` work too.
+5. Add `PUBLIC_NIP05_DOMAIN` if you want the template to issue handles for your domain.
+6. Add `KV_REST_API_URL` and `KV_REST_API_TOKEN` if you want those handle registrations to persist across instances and did not already add them for SSR caching.
+7. Deploy.
 
 No custom `vercel.json` is required for the base template.
 
