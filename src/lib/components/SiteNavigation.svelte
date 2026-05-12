@@ -3,15 +3,13 @@
 
   const items = [
     { href: '/', label: 'Home' },
-    { href: '/projects', label: 'Projects' },
-    { href: '/relays', label: 'Relays' }
+    { href: '/projects', label: 'Projects' }
   ];
 
   function isActive(href: string): boolean {
     const pathname = page.url.pathname;
     if (href === '/') return pathname === '/';
     if (href === '/projects') return pathname === '/projects' || pathname.startsWith('/p/');
-    if (href === '/relays') return pathname === '/relays' || pathname.startsWith('/relay/');
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 </script>

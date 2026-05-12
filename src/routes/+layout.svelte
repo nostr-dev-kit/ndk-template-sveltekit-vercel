@@ -45,6 +45,18 @@
 <footer class="shell footer">
   <div class="footer-grid">
     <span>View source for the age of AI-built software.</span>
-    <span><a href="/about">About Open Prompt</a></span>
+    <span class="footer-links">
+      <a href="/about">About</a>
+      <span aria-hidden="true">·</span>
+      <a href="/relays">Relays</a>
+    </span>
   </div>
 </footer>
+
+<style>
+  .footer-links {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+</style>
