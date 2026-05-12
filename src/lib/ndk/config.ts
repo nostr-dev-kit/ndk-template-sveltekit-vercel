@@ -1,6 +1,4 @@
 export const APP_NAME = 'Open Prompt';
-export const APP_TAGLINE =
-  'The source code of AI-built software — browse the human prompts that built real products.';
 
 const FALLBACK_RELAYS = [
   'wss://relay.primal.net',

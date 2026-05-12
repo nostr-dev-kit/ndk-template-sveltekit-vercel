@@ -58,7 +58,6 @@ export function buildAboutSeo(url: URL): SeoMetadata {
 
 export function buildProfileSeo(args: {
   url: URL;
-  pubkey: string;
   profile?: NDKUserProfile;
 }): SeoMetadata {
   const name = displayName(args.profile, 'Author');
@@ -160,7 +159,7 @@ function defaultImage(url: URL, alt: string): SeoImage {
 }
 
 function canonicalUrl(url: URL): string {
-  return new URL(url.pathname + url.search, url.origin).toString();
+  return new URL(url.pathname, url.origin).toString();
 }
 
 function cleanSnippet(value: string | undefined): string | undefined {

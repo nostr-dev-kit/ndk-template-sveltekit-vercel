@@ -26,7 +26,6 @@ export const load: PageServerLoad = async ({ params, setHeaders, url }) => {
       profile,
       seo: buildProfileSeo({
         url,
-        pubkey: user.pubkey,
         profile
       })
     };

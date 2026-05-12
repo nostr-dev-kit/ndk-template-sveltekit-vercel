@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import { SITE_NAME } from '$lib/seo';
 
   const status = $derived(page.status);
   const message = $derived(page.error?.message ?? '');
@@ -12,7 +13,7 @@
 </script>
 
 <svelte:head>
-  <title>{status} — Open Prompt</title>
+  <title>{status} — {SITE_NAME}</title>
   <meta name="robots" content="noindex" />
 </svelte:head>
 
