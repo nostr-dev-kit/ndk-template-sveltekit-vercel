@@ -93,9 +93,10 @@
 </script>
 
 {#if missing}
-  <section class="profile-container">
+  <section class="profile-container profile-missing">
     <h1>We could not find that profile</h1>
     <p class="muted" style="margin: 0;">Try a different profile link or come back in a moment.</p>
+    <a class="profile-missing-link" href="/projects">← Browse all projects</a>
   </section>
 {:else}
   <section class="profile-container">
@@ -177,6 +178,22 @@
     margin: 0 auto;
     border-radius: var(--radius-md);
     padding: 0 0 1rem;
+  }
+
+  .profile-missing {
+    display: grid;
+    gap: 0.75rem;
+    padding: 2rem 1rem;
+  }
+
+  .profile-missing-link {
+    margin-top: 0.5rem;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .profile-missing-link:hover {
+    color: var(--accent-hover);
   }
 
   .profile-banner {

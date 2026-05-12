@@ -51,6 +51,7 @@
     <span class="eyebrow eyebrow-blue">Project</span>
     <h1>This project is not available.</h1>
     <p class="muted">It may have moved, been deleted, or not synced yet.</p>
+    <a class="project-missing-link" href="/projects">← Back to all projects</a>
   </section>
 {:else}
   <article class="project-page">
@@ -108,6 +109,17 @@
     margin: 0 auto;
     display: grid;
     gap: 0.75rem;
+    justify-items: start;
+  }
+
+  .project-missing-link {
+    margin-top: 0.5rem;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .project-missing-link:hover {
+    color: var(--accent-hover);
   }
 
   .project-header {

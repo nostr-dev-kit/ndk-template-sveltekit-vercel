@@ -78,6 +78,7 @@
     <span class="eyebrow eyebrow-blue">Conversation</span>
     <h1>This conversation is not available.</h1>
     <p class="muted">It may have moved, been deleted, or not synced yet.</p>
+    <a class="conversation-missing-link" href="/projects">← Browse all projects</a>
   </section>
 {:else}
   <article class="conversation-page">
@@ -133,6 +134,17 @@
     margin: 0 auto;
     display: grid;
     gap: 0.75rem;
+    justify-items: start;
+  }
+
+  .conversation-missing-link {
+    margin-top: 0.5rem;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .conversation-missing-link:hover {
+    color: var(--accent-hover);
   }
 
   .conversation-header {
