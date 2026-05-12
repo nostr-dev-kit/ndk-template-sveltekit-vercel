@@ -126,6 +126,46 @@ export function buildNoteSeo(args: {
   };
 }
 
+export function buildProjectsSeo(url: URL): SeoMetadata {
+  return {
+    title: `Projects • ${SITE_NAME}`,
+    description: 'Browse TENEX projects and the human prompts that built them.',
+    canonical: canonicalUrl(url),
+    type: 'website',
+    image: defaultImage(url, `${SITE_NAME} projects preview`)
+  };
+}
+
+export function buildProjectSeo(args: {
+  url: URL;
+  title: string;
+  description: string;
+}): SeoMetadata {
+  const description = cleanSnippet(args.description) || `Conversations behind ${args.title}.`;
+  return {
+    title: `${args.title} • ${SITE_NAME}`,
+    description,
+    canonical: canonicalUrl(args.url),
+    type: 'website',
+    image: defaultImage(args.url, `${args.title} project preview`)
+  };
+}
+
+export function buildConversationSeo(args: {
+  url: URL;
+  title: string;
+  summary: string;
+}): SeoMetadata {
+  const description = cleanSnippet(args.summary) || `Conversation thread on ${SITE_NAME}.`;
+  return {
+    title: `${args.title} • ${SITE_NAME}`,
+    description,
+    canonical: canonicalUrl(args.url),
+    type: 'article',
+    image: defaultImage(args.url, `${args.title} conversation preview`)
+  };
+}
+
 export function buildMissingSeo(url: URL, label: string): SeoMetadata {
   return {
     title: `${label} • ${SITE_NAME}`,
