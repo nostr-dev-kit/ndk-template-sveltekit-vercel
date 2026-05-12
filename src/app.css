@@ -10,8 +10,8 @@
   --text: #2f3437;
   --text-strong: #111111;
   --muted: #787774;
-  --accent: #FF6719;
-  --accent-hover: #e85d17;
+  --accent: hsl(220, 70%, 55%);
+  --accent-hover: hsl(220, 70%, 47%);
   --pale-red: #fdebec;
   --pale-red-text: #9f2f2d;
   --pale-blue: #e1f3fe;

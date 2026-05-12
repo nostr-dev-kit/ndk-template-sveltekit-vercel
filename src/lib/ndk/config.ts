@@ -1,6 +1,6 @@
-export const APP_NAME = 'Highlighter';
+export const APP_NAME = 'Open Prompt';
 export const APP_TAGLINE =
-  'A calm place to read and share long-form writing from Nostr.';
+  'The source code of AI-built software — browse the human prompts that built real products.';
 
 const FALLBACK_RELAYS = [
   'wss://relay.damus.io',

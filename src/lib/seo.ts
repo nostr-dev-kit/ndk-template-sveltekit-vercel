@@ -50,7 +50,7 @@ export function buildAboutSeo(url: URL): SeoMetadata {
   return {
     title: `About ${SITE_NAME}`,
     description:
-      'Learn how Highlighter keeps long-form writing readable, shareable, and easy to revisit.',
+      'Learn how Open Prompt surfaces the human prompts behind AI-built software.',
     canonical: canonicalUrl(url),
     type: 'website',
     image: defaultImage(url, `${SITE_NAME} preview`)
@@ -61,7 +61,7 @@ export function buildOnboardingSeo(url: URL): SeoMetadata {
   return {
     title: `Set up your profile • ${SITE_NAME}`,
     description:
-      'Create your writer profile, choose your interests, and upload an avatar for Highlighter.',
+      'Create your profile, choose your interests, and upload an avatar for Open Prompt.',
     canonical: canonicalUrl(url),
     type: 'website',
     image: defaultImage(url, `${SITE_NAME} onboarding preview`)

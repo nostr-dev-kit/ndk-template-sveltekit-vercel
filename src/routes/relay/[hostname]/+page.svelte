@@ -59,7 +59,7 @@
 </script>
 
 <svelte:head>
-  <title>{relayInfo.nip11?.name || hostname} — Highlighter</title>
+  <title>{relayInfo.nip11?.name || hostname} — Open Prompt</title>
 </svelte:head>
 
 <div class="relay-banner">

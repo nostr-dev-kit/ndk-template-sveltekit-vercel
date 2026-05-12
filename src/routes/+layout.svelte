@@ -29,7 +29,7 @@
 <div class="topbar">
   <div class="shell topbar-inner">
     <a class="brand" href="/">
-      <span class="brand-name">Highlighter</span>
+      <span class="brand-name">Open Prompt</span>
     </a>
 
     <SiteNavigation />
@@ -44,7 +44,7 @@
 
 <footer class="shell footer">
   <div class="footer-grid">
-    <span>Read essays, dispatches, and notes from Nostr.</span>
-    <span><a href="/about">About Highlighter</a></span>
+    <span>View source for the age of AI-built software.</span>
+    <span><a href="/about">About Open Prompt</a></span>
   </div>
 </footer>
