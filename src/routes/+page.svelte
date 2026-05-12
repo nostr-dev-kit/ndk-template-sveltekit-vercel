@@ -1,346 +1,44 @@
 <script lang="ts">
   import type { PageProps } from './$types';
-  import { browser } from '$app/environment';
-  import { NDKEvent, type NostrEvent } from '@nostr-dev-kit/ndk';
-  import StoryAuthor from '$lib/components/StoryAuthor.svelte';
-  import ArticleCard from '$lib/components/ArticleCard.svelte';
-  import { ndk } from '$lib/ndk/client';
-  import {
-    articleImageUrl,
-    articleTitle,
-    articlePublishedAt,
-    articleReadTimeMinutes,
-    articleSummary,
-    noteExcerpt,
-    formatDisplayDate
-  } from '$lib/ndk/format';
-  import { mergeUniqueEvents } from '$lib/ndk/events';
 
-  let { data }: PageProps = $props();
-
-  const discussedComments = ndk.$metaSubscribe(() => {
-    if (!browser) return undefined;
-
-    return {
-      filters: [{ kinds: [1111], '#K': ['30023'], limit: 72 }],
-      sort: 'count'
-    };
-  });
-
-  const recentArticles = ndk.$subscribe(() => {
-    if (!browser) return undefined;
-
-    return {
-      filters: [{ kinds: [30023], limit: 12 }]
-    };
-  });
-
-  const seedArticles = $derived((data.articles ?? []).map((event: NostrEvent) => new NDKEvent(ndk, event)));
-  const liveArticles = $derived(mergeUniqueEvents(recentArticles.events, seedArticles, 12));
-  const articles = $derived(liveArticles.length > 0 ? liveArticles : seedArticles);
-  const activeComments = $derived(discussedComments.events.slice(0, 6));
-  const articleLookup = $derived.by(() => {
-    const lookup = new Map<string, NDKEvent>();
-
-    for (const article of articles) {
-      if (article.id) lookup.set(article.id, article);
-      const tagId = article.tagId();
-      if (tagId) lookup.set(tagId, article);
-    }
-
-    return lookup;
-  });
-  const activeCommentCards = $derived(
-    activeComments.map((event) => ({
-      event,
-      article: resolveCommentTargetArticle(event)
-    }))
-  );
-  const featuredArticle = $derived.by(() =>
-    articles.find((event) => Boolean(articleImageUrl(event.rawEvent())))
-  );
-  const featuredTitle = $derived(featuredArticle ? articleTitle(featuredArticle.rawEvent()) : '');
-  const featuredImage = $derived(featuredArticle ? articleImageUrl(featuredArticle.rawEvent()) : undefined);
-  const feedArticles = $derived.by(() => {
-    const featuredId = featuredArticle?.tagId();
-    if (!featuredId) return articles;
-    return articles.filter((event) => event.tagId() !== featuredId);
-  });
-
-  let featuredImageLoaded = $state(false);
-
-  $effect(() => {
-    featuredImage;
-    featuredImageLoaded = false;
-  });
-
-  function commentTargetReference(comment: NDKEvent): string {
-    return (
-      comment.tags.find((tag) => tag[0] === 'a')?.[1]?.trim() ||
-      comment.tags.find((tag) => tag[0] === 'e')?.[1]?.trim() ||
-      ''
-    );
-  }
-
-  function resolveCommentTargetArticle(comment: NDKEvent): NDKEvent | undefined {
-    const reference = commentTargetReference(comment);
-    return reference ? articleLookup.get(reference) : undefined;
-  }
+  let { }: PageProps = $props();
 </script>
 
-<div class="home-layout">
-  <div class="home-main">
-    <section class="featured-story-section">
-      {#if featuredArticle && featuredImage}
-        <a class="featured-story" href={`/note/${featuredArticle.encode()}`}>
-          <img
-            class="featured-story-image"
-            class:loaded={featuredImageLoaded}
-            src={featuredImage}
-            alt={featuredTitle}
-            loading="eager"
-            decoding="async"
-            fetchpriority="high"
-            onload={() => (featuredImageLoaded = true)}
-          />
-
-          <div class="featured-story-copy">
-            <h1 class="featured-story-title">{featuredTitle}</h1>
-            <p class="featured-story-summary">{articleSummary(featuredArticle.rawEvent(), 280)}</p>
-            <div class="featured-story-meta">
-              <StoryAuthor
-                {ndk}
-                pubkey={featuredArticle.pubkey}
-                profile={data.profiles?.[featuredArticle.pubkey]}
-                avatarClass="article-author-avatar article-author-avatar-compact"
-                compact
-              />
-              <span class="story-pub-meta">
-                <span>{formatDisplayDate(articlePublishedAt(featuredArticle.rawEvent()))}</span>
-                <span>{articleReadTimeMinutes(featuredArticle.content)} min read</span>
-              </span>
-            </div>
-          </div>
-        </a>
-      {:else if articles.length > 0}
-        <div class="featured-story-empty">
-          <h1>No featured story yet.</h1>
-          <p class="muted">The lead story appears once an article ships with a tagged image.</p>
-        </div>
-      {:else}
-        <div class="featured-story-empty">
-          <h1>Waiting for the first story.</h1>
-          <p class="muted">New writing will appear here as soon as stories are available.</p>
-        </div>
-      {/if}
-    </section>
-
-    {#if feedArticles.length > 0}
-      <section class="article-feed">
-        {#each feedArticles as event (event.id)}
-          <ArticleCard {event} authorProfile={data.profiles?.[event.pubkey]} showAuthor />
-        {/each}
-      </section>
-    {/if}
+<section class="landing">
+  <div class="landing-hero">
+    <span class="eyebrow eyebrow-blue">Open Prompt</span>
+    <h1 class="landing-title">View source for the age of AI-built software.</h1>
+    <p class="lede">
+      The source code of AI-built software is the human prompt. Open Prompt is a read-only browser
+      for the conversations behind real products — the messages that shipped the code.
+    </p>
+    <div class="actions">
+      <a class="button" href="/projects">Browse projects</a>
+      <a class="button-link" href="/about">What is this?</a>
+    </div>
   </div>
-
-  {#if activeCommentCards.length > 0}
-    <aside class="home-sidebar">
-      <h2 class="sidebar-heading">Recent comments</h2>
-      <div class="comment-sidebar-list">
-        {#each activeCommentCards as item (item.event.id)}
-          <a
-            class="comment-sidebar-item"
-            href={`/note/${item.article ? item.article.encode() : item.event.encode()}`}
-          >
-            {#if item.article}
-              <span class="comment-sidebar-article">{articleTitle(item.article.rawEvent())}</span>
-            {/if}
-            <p class="comment-sidebar-body">{noteExcerpt(item.event.content, 140)}</p>
-            <div class="comment-sidebar-byline">
-              <StoryAuthor
-                {ndk}
-                pubkey={item.event.pubkey}
-                avatarClass="article-author-avatar article-author-avatar-compact"
-                compact
-              />
-            </div>
-          </a>
-        {/each}
-      </div>
-    </aside>
-  {/if}
-</div>
+</section>
 
 <style>
-  .home-layout {
-    display: grid;
-    grid-template-columns: 1fr 20rem;
-    gap: 3rem;
-    align-items: start;
-  }
-
-  .home-main {
+  .landing {
+    max-width: var(--content-width);
+    margin: 0 auto;
     display: grid;
     gap: 2rem;
-    min-width: 0;
   }
 
-  .featured-story-section {
-    max-width: var(--content-width);
-  }
-
-  .featured-story {
-    display: block;
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .featured-story-image {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    object-fit: cover;
-    border-radius: var(--radius-md);
-    opacity: 0;
-    transition: opacity 400ms ease;
-  }
-
-  .featured-story-image.loaded {
-    opacity: 1;
-  }
-
-  .featured-story-copy {
+  .landing-hero {
     display: grid;
-    gap: 0.75rem;
-    padding: 1.5rem 0;
+    gap: 1.25rem;
   }
 
-  .featured-story-title {
+  .landing-title {
+    margin: 0;
     font-family: var(--font-serif);
-    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-size: clamp(2.2rem, 5vw, 3.6rem);
     font-weight: 700;
-    line-height: 1.1;
+    line-height: 1.05;
     letter-spacing: -0.02em;
     color: var(--text-strong);
-    margin: 0;
-    transition: color 160ms ease;
-  }
-
-  .featured-story:hover .featured-story-title {
-    color: var(--accent);
-  }
-
-  .featured-story-summary {
-    margin: 0;
-    color: var(--muted);
-    font-size: 1.05rem;
-    line-height: 1.6;
-    max-width: 56ch;
-  }
-
-  .featured-story-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .featured-story-empty {
-    display: grid;
-    gap: 0.75rem;
-    padding: 3rem 0;
-  }
-
-  .article-feed {
-    max-width: var(--content-width);
-    display: grid;
-  }
-
-  /* sidebar */
-
-  .home-sidebar {
-    position: sticky;
-    top: 5rem;
-    display: grid;
-    gap: 1rem;
-  }
-
-  .sidebar-heading {
-    margin: 0;
-    font-family: var(--font-sans);
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
-  .comment-sidebar-list {
-    display: grid;
-    gap: 0;
-  }
-
-  .comment-sidebar-item {
-    display: grid;
-    gap: 0.4rem;
-    padding: 1rem 0;
-    border-bottom: 1px solid var(--border-light);
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .comment-sidebar-item:first-child {
-    padding-top: 0;
-  }
-
-  .comment-sidebar-item:last-child {
-    border-bottom: none;
-  }
-
-  .comment-sidebar-article {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .comment-sidebar-body {
-    margin: 0;
-    font-size: 0.88rem;
-    color: var(--text);
-    line-height: 1.5;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .comment-sidebar-item:hover .comment-sidebar-body {
-    color: var(--text-strong);
-  }
-
-  .comment-sidebar-byline {
-    padding-top: 0.25rem;
-  }
-
-  @media (max-width: 900px) {
-    .home-layout {
-      grid-template-columns: 1fr;
-    }
-
-    .home-sidebar {
-      position: static;
-    }
-  }
-
-  @media (max-width: 720px) {
-    .featured-story-image {
-      aspect-ratio: 3 / 2;
-    }
   }
 </style>
