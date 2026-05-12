@@ -14,11 +14,10 @@
     user: NDKUser;
     profile: NDKUserProfile | undefined;
     profileHref: string;
-    shouldFinishOnboarding: boolean;
     onLogout: () => Promise<void>;
   }
 
-  let { user, profile, profileHref, shouldFinishOnboarding, onLogout }: Props = $props();
+  let { user, profile, profileHref, onLogout }: Props = $props();
 
   const userLabel = $derived(authUserLabel(profile));
   const userMeta = $derived(authUserMeta(profile, user.npub || user.pubkey || ''));
@@ -31,10 +30,6 @@
 
   function navigateToEditProfile() {
     void goto('/profile/edit');
-  }
-
-  function navigateToOnboarding() {
-    void goto('/onboarding');
   }
 
   function handleLogout() {
@@ -92,15 +87,6 @@
         </svg>
         <span>Edit profile</span>
       </DropdownMenu.Item>
-
-      {#if shouldFinishOnboarding}
-        <DropdownMenu.Item onSelect={navigateToOnboarding}>
-          <svg class="auth-menu-item-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-          </svg>
-          <span>Finish setup</span>
-        </DropdownMenu.Item>
-      {/if}
 
       <DropdownMenu.Item class="auth-menu-item-danger" onSelect={handleLogout}>
         <svg class="auth-menu-item-icon" viewBox="0 0 24 24" aria-hidden="true">

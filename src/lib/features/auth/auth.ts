@@ -1,14 +1,12 @@
 import { browser } from '$app/environment';
 import {
   NDKNip46Signer,
-  type NDKEvent,
   type NDKUser,
   type NDKUserProfile
 } from '@nostr-dev-kit/ndk';
 import QRCode from 'qrcode';
 import { APP_NAME } from '$lib/ndk/config';
 import { avatarUrl, cleanText, displayName, displayNip05, profileIdentifier } from '$lib/ndk/format';
-import { interestTagsFromEvent, onboardingComplete } from '$lib/onboarding';
 
 const NOSTR_CONNECT_RELAY = 'wss://relay.primal.net';
 
@@ -98,20 +96,4 @@ export function authUserAvatar(profile: NDKUserProfile | undefined): string | un
 
 export function authProfileHref(profile: NDKUserProfile | undefined, npub: string): string {
   return `/profile/${profileIdentifier(profile, npub)}`;
-}
-
-export function needsOnboarding(args: {
-  user: NDKUser | null | undefined;
-  profile: NDKUserProfile | undefined;
-  isReadOnly: boolean;
-  interestEvent: NDKEvent | null | undefined;
-}): boolean {
-  if (!args.user || args.isReadOnly) {
-    return false;
-  }
-
-  return !onboardingComplete({
-    profile: args.profile,
-    interests: interestTagsFromEvent(args.interestEvent)
-  });
 }

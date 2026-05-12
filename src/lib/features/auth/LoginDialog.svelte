@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import { NDKNip07Signer, NDKNip46Signer, NDKPrivateKeySigner } from '@nostr-dev-kit/ndk';
   import { onDestroy } from 'svelte';
   import * as Dialog from '$lib/components/ui/dialog';
@@ -63,10 +62,6 @@
 
   function finishLogin() {
     open = false;
-  }
-
-  function startJoin() {
-    void goto('/onboarding');
   }
 
   async function loginWithExtension() {
@@ -156,7 +151,6 @@
 <div class="auth-panel">
   <Dialog.Root bind:open>
     <div class="auth-guest-actions">
-      <button class="button auth-join" type="button" onclick={startJoin}>Join</button>
       <Dialog.Trigger class="button-secondary auth-trigger">Log in</Dialog.Trigger>
     </div>
 
