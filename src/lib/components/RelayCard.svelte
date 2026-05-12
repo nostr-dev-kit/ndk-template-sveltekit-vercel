@@ -1,6 +1,5 @@
 <script lang="ts">
   import { createRelayInfo } from '@nostr-dev-kit/svelte';
-  import BookmarkIcon from '$lib/components/BookmarkIcon.svelte';
   import { ndk } from '$lib/ndk/client';
 
   let {
@@ -34,7 +33,7 @@
 </script>
 
 {#if hasNip11}
-<a class="relay-card" href={`/relay/${hostname}`}>
+<div class="relay-card">
   <div class="relay-card-icon">
     {#if relayInfo.nip11?.icon}
       <img src={relayInfo.nip11.icon} alt="" />
@@ -58,9 +57,11 @@
           <button
             class="relay-bookmark-btn"
             title={bookmarked ? 'Remove from relays' : 'Bookmark relay'}
-            onclick={(e: MouseEvent) => { e.stopPropagation(); e.preventDefault(); onToggleBookmark(); }}
+            onclick={() => onToggleBookmark()}
           >
-            <BookmarkIcon size={14} filled={bookmarked} />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill={bookmarked ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.5">
+              <path d="M5 2h14a1 1 0 0 1 1 1v19.143a.5.5 0 0 1-.766.424L12 18.03l-7.234 4.536A.5.5 0 0 1 4 22.143V3a1 1 0 0 1 1-1z"/>
+            </svg>
           </button>
         {/if}
       </div>
@@ -70,10 +71,12 @@
     <button
       class="relay-bookmark-btn relay-bookmark-btn-remove"
       title="Remove relay"
-      onclick={(e: MouseEvent) => { e.stopPropagation(); e.preventDefault(); onRemove(); }}
+      onclick={() => onRemove()}
     >
-      <BookmarkIcon size={16} filled />
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5">
+        <path d="M5 2h14a1 1 0 0 1 1 1v19.143a.5.5 0 0 1-.766.424L12 18.03l-7.234 4.536A.5.5 0 0 1 4 22.143V3a1 1 0 0 1 1-1z"/>
+      </svg>
     </button>
   {/if}
-</a>
+</div>
 {/if}

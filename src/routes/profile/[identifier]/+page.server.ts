@@ -1,6 +1,5 @@
-import type { NostrEvent } from '@nostr-dev-kit/ndk';
 import type { PageServerLoad } from './$types';
-import { fetchRecentArticlesByAuthor, fetchUserWithProfile } from '$lib/server/nostr';
+import { fetchUserWithProfile } from '$lib/server/nostr';
 import { buildMissingSeo, buildProfileSeo } from '$lib/seo';
 
 export const load: PageServerLoad = async ({ params, setHeaders, url }) => {
@@ -19,15 +18,12 @@ export const load: PageServerLoad = async ({ params, setHeaders, url }) => {
       };
     }
 
-    const articles = await fetchRecentArticlesByAuthor(user.pubkey, 12);
-
     return {
       missing: false,
       identifier: params.identifier,
       pubkey: user.pubkey,
       npub: user.npub,
       profile,
-      seedArticles: articles.map((event) => event.rawEvent() as NostrEvent),
       seo: buildProfileSeo({
         url,
         pubkey: user.pubkey,

@@ -1,14 +1,10 @@
-import type { NDKUserProfile, NostrEvent } from '@nostr-dev-kit/ndk';
+import type { NDKUserProfile } from '@nostr-dev-kit/ndk';
 import { APP_NAME, APP_TAGLINE } from '$lib/ndk/config';
 import {
-  articleSummary,
   avatarUrl,
-  cleanExcerptText,
   cleanText,
   displayNip05,
   displayName,
-  noteExcerpt,
-  noteTitle,
   truncate
 } from '$lib/ndk/format';
 
@@ -93,39 +89,6 @@ export function buildProfileSeo(args: {
   };
 }
 
-export function buildNoteSeo(args: {
-  url: URL;
-  identifier: string;
-  event: NostrEvent;
-  authorPubkey: string;
-  profile?: NDKUserProfile;
-}): SeoMetadata {
-  const authorName = displayName(args.profile, 'Author');
-  const title = noteTitle(args.event);
-  const previewCopy =
-    args.event.kind === 30023
-      ? previewSnippet(articleSummary(args.event, 220), noteExcerpt(args.event.content, 180))
-      : previewSnippet(noteExcerpt(args.event.content, 220), 'A note shared over Nostr.');
-  const description = truncate(`${authorName}: ${previewCopy}`, 190);
-
-  return {
-    title: `${title} • ${SITE_NAME}`,
-    description,
-    canonical: canonicalUrl(args.url),
-    type: args.event.kind === 30023 ? 'article' : 'website',
-    image: {
-      url: noteImage(args.url, args.identifier),
-      alt: `${title} preview`,
-      width: DEFAULT_SOCIAL_IMAGE_WIDTH,
-      height: DEFAULT_SOCIAL_IMAGE_HEIGHT
-    },
-    author: authorName,
-    publishedTime: args.event.created_at
-      ? new Date(args.event.created_at * 1000).toISOString()
-      : undefined
-  };
-}
-
 export function buildProjectsSeo(url: URL): SeoMetadata {
   return {
     title: `Projects • ${SITE_NAME}`,
@@ -186,10 +149,6 @@ function defaultImage(url: URL, alt: string): SeoImage {
   };
 }
 
-function noteImage(url: URL, identifier: string): string {
-  return new URL(`/og/note/${encodeURIComponent(identifier)}`, url.origin).toString();
-}
-
 function canonicalUrl(url: URL): string {
   return new URL(url.pathname + url.search, url.origin).toString();
 }
@@ -203,12 +162,3 @@ function cleanSnippet(value: string | undefined): string | undefined {
   return truncate(normalized, 180) || undefined;
 }
 
-function previewSnippet(value: string, fallback: string): string {
-  const sanitized = cleanExcerptText(
-    value
-      .replace(/\(\s*https?:\/\/[^)]+\)/g, ' ')
-      .replace(/https?:\/\/\S+/g, ' ')
-      .replace(/\(\s*\)/g, ' ')
-  );
-  return sanitized || fallback;
-}
