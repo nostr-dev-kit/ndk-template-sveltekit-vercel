@@ -14,6 +14,46 @@ import {
 
 const FETCH_TIMEOUT_MS = 4000;
 const CACHE_FETCH_TIMEOUT_MS = 800;
+const CACHE_FRESH_TTL_MS = 60_000;
+
+const cacheFreshness = new Map<string, number>();
+const inflightRefreshes = new Map<string, Promise<void>>();
+
+async function refreshFromRelay(
+  filters: NDKFilter | NDKFilter[],
+  label: string,
+  timeoutMs: number
+): Promise<NDKEvent[]> {
+  const ndk = await getServerNdk();
+  const events = await withTimeout(
+    ndk.fetchEvents(filters, {
+      closeOnEose: true,
+      cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY
+    }),
+    undefined,
+    label,
+    timeoutMs
+  );
+  cacheFreshness.set(label, Date.now());
+  return events ? Array.from(events) : [];
+}
+
+function scheduleBackgroundRefresh(
+  filters: NDKFilter | NDKFilter[],
+  label: string,
+  timeoutMs: number
+): void {
+  if (inflightRefreshes.has(label)) return;
+  const task = refreshFromRelay(filters, label, timeoutMs)
+    .then(() => undefined)
+    .catch((error) => {
+      console.warn(`${label} background refresh failed`, error);
+    })
+    .finally(() => {
+      inflightRefreshes.delete(label);
+    });
+  inflightRefreshes.set(label, task);
+}
 
 async function fetchEvents(
   filters: NDKFilter | NDKFilter[],
@@ -35,22 +75,15 @@ async function fetchEvents(
     : undefined;
 
   if (cached && cached.size > 0) {
+    const lastRefreshed = cacheFreshness.get(label) ?? 0;
+    const isStale = Date.now() - lastRefreshed > CACHE_FRESH_TTL_MS;
+    if (isStale) {
+      scheduleBackgroundRefresh(filters, label, timeoutMs);
+    }
     return Array.from(cached);
   }
 
-  await getServerNdk();
-
-  const events = await withTimeout(
-    ndk.fetchEvents(filters, {
-      closeOnEose: true,
-      cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY
-    }),
-    undefined,
-    label,
-    timeoutMs
-  );
-
-  return events ? Array.from(events) : [];
+  return refreshFromRelay(filters, label, timeoutMs);
 }
 
 export async function fetchTenexProjects(limit = 60): Promise<TenexProject[]> {

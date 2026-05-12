@@ -2,17 +2,8 @@ import type { NostrEvent } from '@nostr-dev-kit/ndk';
 import type { PageServerLoad } from './$types';
 import { fetchProfilesByPubkeys } from '$lib/server/nostr';
 import { fetchConversationBundle, fetchTenexProjectByAddress, rawEventList } from '$lib/server/tenex';
-import { KIND_PROJECT } from '$lib/ndk/tenex';
+import { KIND_PROJECT, parseProjectAddress } from '$lib/ndk/tenex';
 import { buildConversationSeo, buildMissingSeo } from '$lib/seo';
-
-function parseProjectAddress(address: string | undefined):
-  | { pubkey: string; dTag: string }
-  | undefined {
-  if (!address) return undefined;
-  const [kindString, pubkey, dTag] = address.split(':');
-  if (Number(kindString) !== KIND_PROJECT || !pubkey || dTag === undefined) return undefined;
-  return { pubkey, dTag };
-}
 
 export const load: PageServerLoad = async ({ params, setHeaders, url }) => {
   setHeaders({
@@ -36,9 +27,10 @@ export const load: PageServerLoad = async ({ params, setHeaders, url }) => {
     }
 
     const projectRef = parseProjectAddress(projectAddress);
-    const project = projectRef
-      ? await fetchTenexProjectByAddress(projectRef.pubkey, projectRef.dTag)
-      : undefined;
+    const project =
+      projectRef && projectRef.kind === KIND_PROJECT
+        ? await fetchTenexProjectByAddress(projectRef.pubkey, projectRef.dTag)
+        : undefined;
 
     const messagePubkeys = new Set<string>();
     if (root) messagePubkeys.add(root.pubkey);

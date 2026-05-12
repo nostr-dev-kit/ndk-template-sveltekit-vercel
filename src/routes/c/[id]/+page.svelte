@@ -6,8 +6,10 @@
   import MessageBlock from '$lib/components/MessageBlock.svelte';
   import { mergeUniqueEvents } from '$lib/ndk/events';
   import {
+    KIND_CONVERSATION_METADATA,
     KIND_MESSAGE,
     findAgent,
+    parseConversationMetadata,
     relativeTime,
     sortMessagesChronologically
   } from '$lib/ndk/tenex';
@@ -30,28 +32,16 @@
   const liveMetadata = ndk.$subscribe(() => {
     if (!browser || !rootId) return undefined;
     return {
-      filters: [{ kinds: [513 as number], '#e': [rootId], limit: 10 }]
+      filters: [{ kinds: [KIND_CONVERSATION_METADATA as number], '#e': [rootId], limit: 10 }]
     };
   });
 
   const meta = $derived.by(() => {
-    const seedMeta = data.meta;
-    let latest = seedMeta;
+    let latest = data.meta;
 
     for (const event of liveMetadata.events) {
-      const tags = event.tags ?? [];
-      const tagValue = (name: string) => tags.find((tag) => tag[0] === name)?.[1] ?? '';
-      const projectAddress = tagValue('a');
-      if (!projectAddress) continue;
-      const candidate = {
-        rootId,
-        projectAddress,
-        title: tagValue('title') || 'Untitled conversation',
-        summary: tagValue('summary'),
-        statusLabel: tagValue('status-label') || undefined,
-        statusActivity: tagValue('status-current-activity') || undefined,
-        updatedAt: event.created_at ?? 0
-      };
+      const candidate = parseConversationMetadata(event);
+      if (!candidate) continue;
       if (!latest || candidate.updatedAt > latest.updatedAt) {
         latest = candidate;
       }
@@ -79,7 +69,8 @@
   }
 
   const conversationTitle = $derived(meta?.title || 'Conversation');
-  const missing = $derived(data.missing || (!seedRoot && (data.messages ?? []).length === 0));
+  const missing = $derived(data.missing && allMessages.length === 0 && !meta);
+  const loading = $derived(!missing && allMessages.length === 0);
 </script>
 
 {#if missing}
@@ -118,9 +109,13 @@
     </header>
 
     <section class="conversation-thread">
-      {#each allMessages as event (event.id)}
-        <MessageBlock {event} agent={project ? findAgent(event.pubkey, project.agents) : undefined} />
-      {/each}
+      {#if loading}
+        <p class="conversation-loading muted">Loading messages…</p>
+      {:else}
+        {#each allMessages as event (event.id)}
+          <MessageBlock {event} agent={project ? findAgent(event.pubkey, project.agents) : undefined} />
+        {/each}
+      {/if}
     </section>
   </article>
 {/if}
@@ -187,5 +182,9 @@
 
   .conversation-thread {
     display: grid;
+  }
+
+  .conversation-loading {
+    padding: 1.5rem 0;
   }
 </style>

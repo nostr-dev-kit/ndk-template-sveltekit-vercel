@@ -56,6 +56,8 @@ function tagValue(tags: string[][], name: string): string | undefined {
 
 export function parseProjectEvent(event: NDKEvent | NostrEvent): TenexProject | undefined {
   const tags = event.tags ?? [];
+  if (tags.some((tag) => tag[0] === 'deleted')) return undefined;
+
   const dTag = cleanText(tagValue(tags, 'd'));
   if (!dTag) return undefined;
 
@@ -82,13 +84,24 @@ export function parseProjectEvent(event: NDKEvent | NostrEvent): TenexProject | 
 }
 
 export function parseAgents(tags: string[][]): TenexAgent[] {
-  return tags
-    .filter((tag) => tag[0] === 'agent' && tag[1])
-    .map((tag) => ({
+  const byPubkey = new Map<string, TenexAgent>();
+
+  for (const tag of tags) {
+    if (tag[0] !== 'p' || !tag[1]) continue;
+    if (byPubkey.has(tag[1])) continue;
+    byPubkey.set(tag[1], { pubkey: tag[1] });
+  }
+
+  for (const tag of tags) {
+    if (tag[0] !== 'agent' || !tag[1]) continue;
+    byPubkey.set(tag[1], {
       pubkey: tag[1],
       slug: cleanText(tag[2]) || undefined,
       role: cleanText(tag[3]) || undefined
-    }));
+    });
+  }
+
+  return Array.from(byPubkey.values());
 }
 
 export function parseModels(tags: string[][]): TenexModel[] {
@@ -126,6 +139,19 @@ export function parseConversationMetadata(
     statusActivity: cleanText(tagValue(tags, 'status-current-activity')) || undefined,
     updatedAt: (event as NostrEvent).created_at ?? 0
   };
+}
+
+export function parseProjectAddress(
+  address: string | undefined
+): { kind: number; pubkey: string; dTag: string } | undefined {
+  if (!address) return undefined;
+  const parts = address.split(':');
+  if (parts.length < 3) return undefined;
+  const kind = Number.parseInt(parts[0], 10);
+  const pubkey = parts[1];
+  const dTag = parts.slice(2).join(':');
+  if (!Number.isFinite(kind) || !pubkey || !dTag) return undefined;
+  return { kind, pubkey, dTag };
 }
 
 export function encodeProjectNaddr(args: { pubkey: string; dTag: string }): string {
