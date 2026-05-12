@@ -147,7 +147,9 @@ export function parseProjectAddress(
   if (!address) return undefined;
   const parts = address.split(':');
   if (parts.length < 3) return undefined;
-  const kind = Number(parts[0]);
+  const kindStr = parts[0];
+  if (!/^(0|[1-9]\d*)$/.test(kindStr)) return undefined;
+  const kind = Number(kindStr);
   const pubkey = parts[1];
   const dTag = parts.slice(2).join(':');
   if (!Number.isInteger(kind) || !Number.isFinite(kind) || !pubkey || !dTag) return undefined;
