@@ -12,7 +12,6 @@ import {
   type TenexProject
 } from '$lib/ndk/tenex';
 
-const PABLO_PUBKEY = '09d48a1a5dbe13404a729634f1d6ba722d40513468dd713c8ea38ca9b7b6f2c7';
 const FETCH_TIMEOUT_MS = 4000;
 const CACHE_FETCH_TIMEOUT_MS = 800;
 
@@ -55,12 +54,10 @@ async function fetchEvents(
 }
 
 export async function fetchTenexProjects(limit = 60): Promise<TenexProject[]> {
-  const filters: NDKFilter[] = [
-    { kinds: [KIND_PROJECT], authors: [PABLO_PUBKEY], limit },
-    { kinds: [KIND_PROJECT], limit }
-  ];
-
-  const events = await fetchEvents(filters, `fetchTenexProjects(${limit})`);
+  const events = await fetchEvents(
+    { kinds: [KIND_PROJECT], limit },
+    `fetchTenexProjects(${limit})`
+  );
 
   const byAddress = new Map<string, TenexProject>();
   for (const event of events) {

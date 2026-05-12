@@ -1,7 +1,7 @@
 <script lang="ts">
   import { ndk } from '$lib/ndk/client';
   import { User } from '$lib/ndk/ui/user';
-  import type { TenexAgent, TenexModel } from '$lib/ndk/tenex';
+  import { modelForAgentSlug, type TenexAgent, type TenexModel } from '$lib/ndk/tenex';
 
   interface Props {
     agents: TenexAgent[];
@@ -9,10 +9,6 @@
   }
 
   let { agents, models }: Props = $props();
-
-  function modelForSlug(slug: string): string | undefined {
-    return models.find((model) => model.assignedAgentSlug === slug)?.name;
-  }
 </script>
 
 {#if agents.length > 0}
@@ -26,12 +22,18 @@
           <User.Root {ndk} pubkey={agent.pubkey}>
             <User.Avatar class="agent-card-avatar" />
             <div class="agent-card-body">
-              <span class="agent-card-slug">{agent.slug}</span>
+              <span class="agent-card-slug">
+                {#if agent.slug}
+                  {agent.slug}
+                {:else}
+                  <User.Name fallback={`${agent.pubkey.slice(0, 8)}…`} />
+                {/if}
+              </span>
               {#if agent.role}
                 <span class="agent-card-role">{agent.role}</span>
               {/if}
-              {#if modelForSlug(agent.slug)}
-                <span class="agent-card-model">{modelForSlug(agent.slug)}</span>
+              {#if modelForAgentSlug(agent.slug, models)}
+                <span class="agent-card-model">{modelForAgentSlug(agent.slug, models)}</span>
               {/if}
             </div>
           </User.Root>

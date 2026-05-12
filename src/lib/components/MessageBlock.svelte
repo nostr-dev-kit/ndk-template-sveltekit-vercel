@@ -35,8 +35,8 @@
   });
 
   const roleLabel = $derived.by(() => {
-    if (agent) return agent.slug;
-    return 'Human';
+    if (!agent) return 'Human';
+    return agent.slug ?? '';
   });
 </script>
 
@@ -52,7 +52,13 @@
         </a>
         <div class="message-meta-row">
           <span class="message-role" class:role-agent={isAgent} class:role-human={!isAgent}>
-            {#if !isAgent}<span aria-hidden="true">🧑 </span>{/if}{roleLabel}
+            {#if !isAgent}
+              <span aria-hidden="true">🧑 </span>Human
+            {:else if roleLabel}
+              {roleLabel}
+            {:else}
+              Agent
+            {/if}
           </span>
           {#if agent?.role}
             <span class="message-role-detail">{agent.role}</span>

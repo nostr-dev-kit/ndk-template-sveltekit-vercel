@@ -8,7 +8,7 @@ export const KIND_MESSAGE = 1;
 
 export type TenexAgent = {
   pubkey: string;
-  slug: string;
+  slug?: string;
   role?: string;
 };
 
@@ -86,7 +86,7 @@ export function parseAgents(tags: string[][]): TenexAgent[] {
     .filter((tag) => tag[0] === 'agent' && tag[1])
     .map((tag) => ({
       pubkey: tag[1],
-      slug: cleanText(tag[2]) || 'agent',
+      slug: cleanText(tag[2]) || undefined,
       role: cleanText(tag[3]) || undefined
     }));
 }
@@ -160,6 +160,11 @@ export function isAgentPubkey(pubkey: string, agents: TenexAgent[]): boolean {
 
 export function findAgent(pubkey: string, agents: TenexAgent[]): TenexAgent | undefined {
   return agents.find((agent) => agent.pubkey === pubkey);
+}
+
+export function modelForAgentSlug(slug: string | undefined, models: TenexModel[]): string | undefined {
+  if (!slug) return undefined;
+  return models.find((model) => model.assignedAgentSlug === slug)?.name;
 }
 
 export function projectMessageSummary(content: string, max = 220): string {
