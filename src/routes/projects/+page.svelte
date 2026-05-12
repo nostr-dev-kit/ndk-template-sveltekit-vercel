@@ -22,12 +22,25 @@
     }
 
     for (const event of liveProjects.events) {
+      const tags = event.tags ?? [];
+      const dTag = tags.find((tag) => tag[0] === 'd')?.[1];
+      if (!dTag || !event.pubkey) continue;
+      const address = `${KIND_PROJECT}:${event.pubkey}:${dTag}`;
+      const eventCreatedAt = event.created_at ?? 0;
+      const existing = byAddress.get(address);
+      const isDeleted = tags.some((tag) => tag[0] === 'deleted');
+
+      if (isDeleted) {
+        if (existing && eventCreatedAt >= existing.createdAt) {
+          byAddress.delete(address);
+        }
+        continue;
+      }
+
+      if (existing && eventCreatedAt <= existing.createdAt) continue;
       const project = parseProjectEvent(event);
       if (!project) continue;
-      const existing = byAddress.get(project.address);
-      if (!existing || project.createdAt > existing.createdAt) {
-        byAddress.set(project.address, project);
-      }
+      byAddress.set(project.address, project);
     }
 
     return Array.from(byAddress.values()).sort((a, b) => b.createdAt - a.createdAt);

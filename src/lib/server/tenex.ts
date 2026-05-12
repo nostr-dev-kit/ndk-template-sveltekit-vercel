@@ -17,25 +17,38 @@ const CACHE_FETCH_TIMEOUT_MS = 800;
 const CACHE_FRESH_TTL_MS = 60_000;
 
 const cacheFreshness = new Map<string, number>();
-const inflightRefreshes = new Map<string, Promise<void>>();
+const inflightRefreshes = new Map<string, Promise<NDKEvent[]>>();
 
-async function refreshFromRelay(
+function refreshFromRelay(
   filters: NDKFilter | NDKFilter[],
   label: string,
   timeoutMs: number
 ): Promise<NDKEvent[]> {
-  const ndk = await getServerNdk();
-  const events = await withTimeout(
-    ndk.fetchEvents(filters, {
-      closeOnEose: true,
-      cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY
-    }),
-    undefined,
-    label,
-    timeoutMs
-  );
-  cacheFreshness.set(label, Date.now());
-  return events ? Array.from(events) : [];
+  const existing = inflightRefreshes.get(label);
+  if (existing) return existing;
+
+  const task = (async () => {
+    const ndk = await getServerNdk();
+    const events = await withTimeout(
+      ndk.fetchEvents(filters, {
+        closeOnEose: true,
+        cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY
+      }),
+      undefined,
+      label,
+      timeoutMs
+    );
+    if (events && events.size > 0) {
+      cacheFreshness.set(label, Date.now());
+      return Array.from(events);
+    }
+    return [];
+  })().finally(() => {
+    inflightRefreshes.delete(label);
+  });
+
+  inflightRefreshes.set(label, task);
+  return task;
 }
 
 function scheduleBackgroundRefresh(
@@ -44,15 +57,9 @@ function scheduleBackgroundRefresh(
   timeoutMs: number
 ): void {
   if (inflightRefreshes.has(label)) return;
-  const task = refreshFromRelay(filters, label, timeoutMs)
-    .then(() => undefined)
-    .catch((error) => {
-      console.warn(`${label} background refresh failed`, error);
-    })
-    .finally(() => {
-      inflightRefreshes.delete(label);
-    });
-  inflightRefreshes.set(label, task);
+  refreshFromRelay(filters, label, timeoutMs).catch((error) => {
+    console.warn(`${label} background refresh failed`, error);
+  });
 }
 
 async function fetchEvents(
@@ -92,18 +99,26 @@ export async function fetchTenexProjects(limit = 60): Promise<TenexProject[]> {
     `fetchTenexProjects(${limit})`
   );
 
-  const byAddress = new Map<string, TenexProject>();
+  const latestByAddress = new Map<string, NDKEvent>();
   for (const event of events) {
-    const project = parseProjectEvent(event);
-    if (!project) continue;
-
-    const existing = byAddress.get(project.address);
-    if (!existing || project.createdAt > existing.createdAt) {
-      byAddress.set(project.address, project);
+    const tags = event.tags ?? [];
+    const dTag = tags.find((tag) => tag[0] === 'd')?.[1];
+    if (!dTag || !event.pubkey) continue;
+    const address = `${KIND_PROJECT}:${event.pubkey}:${dTag}`;
+    const existing = latestByAddress.get(address);
+    if (!existing || (event.created_at ?? 0) > (existing.created_at ?? 0)) {
+      latestByAddress.set(address, event);
     }
   }
 
-  return Array.from(byAddress.values()).sort((a, b) => b.createdAt - a.createdAt);
+  const projects: TenexProject[] = [];
+  for (const event of latestByAddress.values()) {
+    const project = parseProjectEvent(event);
+    if (!project) continue;
+    projects.push(project);
+  }
+
+  return projects.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 export async function fetchTenexProjectByAddress(
