@@ -17,8 +17,7 @@
     "@nostr-dev-kit/svelte": "^4.0.0",
     "bits-ui": "^2.18.0",
     "marked": "^17.0.6",
-    "qrcode": "^1.5.4",
-    "sharp": "^0.34.5"
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@sveltejs/adapter-vercel": "^6.3.3",

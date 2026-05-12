@@ -10,7 +10,7 @@
     const pathname = page.url.pathname;
     if (href === '/') return pathname === '/';
     if (href === '/projects') return pathname === '/projects' || pathname.startsWith('/p/');
-    return pathname === href || pathname.startsWith(`${href}/`);
+    return false;
   }
 </script>
 

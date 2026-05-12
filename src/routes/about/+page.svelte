@@ -1,6 +1,3 @@
-<script lang="ts">
-</script>
-
 <article class="about">
   <header class="about-header">
     <h1>About Open Prompt</h1>

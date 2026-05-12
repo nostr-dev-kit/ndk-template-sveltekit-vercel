@@ -3,7 +3,8 @@
   import type { PageProps } from './$types';
   import { ndk } from '$lib/ndk/client';
   import ProjectCard from '$lib/components/ProjectCard.svelte';
-  import { KIND_PROJECT, parseProjectEvent, type TenexProject } from '$lib/ndk/tenex';
+  import { KIND_PROJECT, type TenexProject } from '$lib/ndk/tenex';
+  import { mergeProjects } from '$lib/ndk/mergeProjects';
 
   let { data }: PageProps = $props();
 
@@ -14,37 +15,9 @@
     };
   });
 
-  const featuredProjects = $derived.by<TenexProject[]>(() => {
-    const byAddress = new Map<string, TenexProject>();
-
-    for (const seed of data.featuredProjects) {
-      byAddress.set(seed.address, seed);
-    }
-
-    for (const event of liveProjects.events) {
-      const tags = event.tags ?? [];
-      const dTag = tags.find((tag) => tag[0] === 'd')?.[1];
-      if (!dTag || !event.pubkey) continue;
-      const address = `${KIND_PROJECT}:${event.pubkey}:${dTag}`;
-      const isDeleted = tags.some((tag) => tag[0] === 'deleted');
-
-      if (isDeleted) {
-        byAddress.delete(address);
-        continue;
-      }
-
-      const existing = byAddress.get(address);
-      const eventCreatedAt = event.created_at ?? 0;
-      if (existing && eventCreatedAt <= existing.createdAt) continue;
-      const project = parseProjectEvent(event);
-      if (!project) continue;
-      byAddress.set(project.address, project);
-    }
-
-    return Array.from(byAddress.values())
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 4);
-  });
+  const featuredProjects = $derived.by<TenexProject[]>(() =>
+    mergeProjects(data.featuredProjects, liveProjects.events).slice(0, 4)
+  );
 </script>
 
 <section class="landing">
