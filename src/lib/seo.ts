@@ -1,5 +1,5 @@
 import type { NDKUserProfile } from '@nostr-dev-kit/ndk';
-import { APP_NAME, APP_TAGLINE } from '$lib/ndk/config';
+import { APP_NAME } from '$lib/ndk/config';
 import {
   avatarUrl,
   cleanText,
@@ -12,6 +12,9 @@ export const SITE_NAME = APP_NAME;
 export const DEFAULT_SOCIAL_IMAGE_PATH = '/og-default.png';
 export const DEFAULT_SOCIAL_IMAGE_WIDTH = 1200;
 export const DEFAULT_SOCIAL_IMAGE_HEIGHT = 630;
+
+const HOME_DESCRIPTION =
+  'View source for the age of AI-built software. Browse the human prompts that built real products.';
 
 export type SeoImage = {
   url: string;
@@ -34,8 +37,8 @@ export type SeoMetadata = {
 
 export function buildHomeSeo(url: URL): SeoMetadata {
   return {
-    title: SITE_NAME,
-    description: APP_TAGLINE,
+    title: `${SITE_NAME} — The source code is now English`,
+    description: HOME_DESCRIPTION,
     canonical: canonicalUrl(url),
     type: 'website',
     image: defaultImage(url, `${SITE_NAME} preview`)
@@ -44,23 +47,12 @@ export function buildHomeSeo(url: URL): SeoMetadata {
 
 export function buildAboutSeo(url: URL): SeoMetadata {
   return {
-    title: `About ${SITE_NAME}`,
+    title: `About — ${SITE_NAME}`,
     description:
-      'Learn how Open Prompt surfaces the human prompts behind AI-built software.',
+      'Why Open Prompt exists: source code is now English, and the prompts that built each product are the real artifact.',
     canonical: canonicalUrl(url),
     type: 'website',
     image: defaultImage(url, `${SITE_NAME} preview`)
-  };
-}
-
-export function buildOnboardingSeo(url: URL): SeoMetadata {
-  return {
-    title: `Set up your profile • ${SITE_NAME}`,
-    description:
-      'Create your profile, choose your interests, and upload an avatar for Open Prompt.',
-    canonical: canonicalUrl(url),
-    type: 'website',
-    image: defaultImage(url, `${SITE_NAME} onboarding preview`)
   };
 }
 
@@ -74,8 +66,8 @@ export function buildProfileSeo(args: {
   const imageUrl = avatarUrl(args.profile);
 
   return {
-    title: `${name} • ${SITE_NAME}`,
-    description: about || `${name}'s profile and recent writing on ${SITE_NAME}.`,
+    title: `${name} — ${SITE_NAME}`,
+    description: about || `${name} on ${SITE_NAME}.`,
     canonical: canonicalUrl(args.url),
     type: 'profile',
     image: imageUrl
@@ -91,7 +83,7 @@ export function buildProfileSeo(args: {
 
 export function buildProjectsSeo(url: URL): SeoMetadata {
   return {
-    title: `Projects • ${SITE_NAME}`,
+    title: `Projects — ${SITE_NAME}`,
     description: 'Browse TENEX projects and the human prompts that built them.',
     canonical: canonicalUrl(url),
     type: 'website',
@@ -104,9 +96,11 @@ export function buildProjectSeo(args: {
   title: string;
   description: string;
 }): SeoMetadata {
-  const description = cleanSnippet(args.description) || `Conversations behind ${args.title}.`;
+  const description =
+    cleanSnippet(args.description) ||
+    `Browse conversations from ${args.title} on ${SITE_NAME}.`;
   return {
-    title: `${args.title} • ${SITE_NAME}`,
+    title: `${args.title} — ${SITE_NAME}`,
     description,
     canonical: canonicalUrl(args.url),
     type: 'website',
@@ -118,10 +112,15 @@ export function buildConversationSeo(args: {
   url: URL;
   title: string;
   summary: string;
+  projectTitle?: string;
 }): SeoMetadata {
-  const description = cleanSnippet(args.summary) || `Conversation thread on ${SITE_NAME}.`;
+  const description =
+    cleanSnippet(args.summary) ||
+    (args.projectTitle
+      ? `A conversation from ${args.projectTitle} on ${SITE_NAME}.`
+      : `A conversation on ${SITE_NAME}.`);
   return {
-    title: `${args.title} • ${SITE_NAME}`,
+    title: `${args.title} — ${SITE_NAME}`,
     description,
     canonical: canonicalUrl(args.url),
     type: 'article',
@@ -129,9 +128,20 @@ export function buildConversationSeo(args: {
   };
 }
 
+export function buildRelaysSeo(url: URL): SeoMetadata {
+  return {
+    title: `Relays — ${SITE_NAME}`,
+    description:
+      'Discover the Nostr relays where Open Prompt fetches projects, prompts, and conversations.',
+    canonical: canonicalUrl(url),
+    type: 'website',
+    image: defaultImage(url, `${SITE_NAME} relays preview`)
+  };
+}
+
 export function buildMissingSeo(url: URL, label: string): SeoMetadata {
   return {
-    title: `${label} • ${SITE_NAME}`,
+    title: `${label} — ${SITE_NAME}`,
     description: 'The page you requested is not available right now.',
     canonical: canonicalUrl(url),
     type: 'website',

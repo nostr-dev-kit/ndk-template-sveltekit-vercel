@@ -56,7 +56,12 @@ export const load: PageServerLoad = async ({ params, setHeaders, url }) => {
       meta: meta ?? undefined,
       project: project ?? undefined,
       profiles,
-      seo: buildConversationSeo({ url, title, summary })
+      seo: buildConversationSeo({
+        url,
+        title,
+        summary,
+        projectTitle: project?.title
+      })
     };
   } catch (error) {
     console.warn('Conversation SSR load failed', error);

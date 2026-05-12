@@ -82,10 +82,6 @@
   });
 </script>
 
-<svelte:head>
-  <title>Relays — Open Prompt</title>
-</svelte:head>
-
 <div class="bookmarks-layout">
   <div class="bookmarks-main">
     {#if currentUser}
