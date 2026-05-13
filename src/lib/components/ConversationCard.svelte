@@ -1,13 +1,41 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
   import type { NDKEvent } from '@nostr-dev-kit/ndk';
-  import { relativeTime, type TenexConversationMeta } from '$lib/ndk/tenex';
+  import { ndk } from '$lib/ndk/client';
+  import {
+    KIND_CONVERSATION_METADATA,
+    parseConversationMetadata,
+    relativeTime,
+    type TenexConversationMeta
+  } from '$lib/ndk/tenex';
 
   interface Props {
     rootEvent: NDKEvent;
     metadata?: TenexConversationMeta;
   }
 
-  let { rootEvent, metadata }: Props = $props();
+  let { rootEvent, metadata: seedMetadata }: Props = $props();
+
+  const liveMetadata = ndk.$subscribe(() => {
+    if (!browser || !rootEvent.id) return undefined;
+    return {
+      filters: [
+        { kinds: [KIND_CONVERSATION_METADATA as number], '#e': [rootEvent.id], limit: 10 }
+      ]
+    };
+  });
+
+  const metadata = $derived.by<TenexConversationMeta | undefined>(() => {
+    let latest = seedMetadata;
+    for (const event of liveMetadata.events) {
+      const candidate = parseConversationMetadata(event);
+      if (!candidate) continue;
+      if (!latest || candidate.updatedAt > latest.updatedAt) {
+        latest = candidate;
+      }
+    }
+    return latest;
+  });
 
   function normalizePromptPreview(value: string): string {
     let out = '';
