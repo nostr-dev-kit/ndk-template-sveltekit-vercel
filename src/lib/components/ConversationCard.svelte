@@ -1,32 +1,40 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import type { NDKEvent } from '@nostr-dev-kit/ndk';
   import { ndk } from '$lib/ndk/client';
   import {
     KIND_CONVERSATION_METADATA,
+    KIND_MESSAGE,
     parseConversationMetadata,
     relativeTime,
     type TenexConversationMeta
   } from '$lib/ndk/tenex';
 
   interface Props {
-    rootEvent: NDKEvent;
-    metadata?: TenexConversationMeta;
+    rootId: string;
   }
 
-  let { rootEvent, metadata: seedMetadata }: Props = $props();
+  let { rootId }: Props = $props();
+
+  const rootSubscription = ndk.$subscribe(() => {
+    if (!browser || !rootId) return undefined;
+    return {
+      filters: [{ kinds: [KIND_MESSAGE], ids: [rootId] }]
+    };
+  });
+
+  const rootEvent = $derived(rootSubscription.events[0]);
 
   const liveMetadata = ndk.$subscribe(() => {
-    if (!browser || !rootEvent.id) return undefined;
+    if (!browser || !rootId) return undefined;
     return {
       filters: [
-        { kinds: [KIND_CONVERSATION_METADATA as number], '#e': [rootEvent.id], limit: 10 }
+        { kinds: [KIND_CONVERSATION_METADATA as number], '#e': [rootId], limit: 10 }
       ]
     };
   });
 
   const metadata = $derived.by<TenexConversationMeta | undefined>(() => {
-    let latest = seedMetadata;
+    let latest: TenexConversationMeta | undefined;
     for (const event of liveMetadata.events) {
       const candidate = parseConversationMetadata(event);
       if (!candidate) continue;
@@ -52,11 +60,13 @@
     return out.replace(/\n{3,}/g, '\n\n').trim();
   }
 
-  const promptText = $derived(normalizePromptPreview(rootEvent.content ?? ''));
+  const promptText = $derived(normalizePromptPreview(rootEvent?.content ?? ''));
 
-  const displayTitle = $derived(metadata?.title || undefined);
+  const displayTitle = $derived(metadata?.title || promptText || undefined);
 
-  const timestamp = $derived(metadata?.updatedAt ?? rootEvent.created_at ?? 0);
+  const displaySummary = $derived(metadata?.summary || undefined);
+
+  const timestamp = $derived(metadata?.updatedAt ?? rootEvent?.created_at ?? 0);
 
   const statusVariant = $derived.by(() => {
     const label = metadata?.statusLabel?.toLowerCase() ?? '';
@@ -74,19 +84,20 @@
   });
 </script>
 
-<a class="conversation-card" href={`/c/${rootEvent.id}`}>
-  {#if promptText}
-    <p class="conversation-card-prompt">{promptText}</p>
+<a class="conversation-card" href={`/c/${rootId}`}>
+  {#if displayTitle}
+    <h3 class="conversation-card-title">{displayTitle}</h3>
+  {:else if rootEvent}
+    <h3 class="conversation-card-title conversation-card-title-empty">(untitled)</h3>
   {:else}
-    <p class="conversation-card-prompt conversation-card-prompt-empty">
-      (no message content)
-    </p>
+    <h3 class="conversation-card-title conversation-card-title-empty">Loading…</h3>
+  {/if}
+
+  {#if displaySummary}
+    <p class="conversation-card-summary">{displaySummary}</p>
   {/if}
 
   <div class="conversation-card-meta">
-    {#if displayTitle}
-      <span class="conversation-card-title">{displayTitle}</span>
-    {/if}
     {#if metadata?.statusLabel}
       <span class="conversation-status-badge {statusVariant}">{metadata.statusLabel}</span>
     {/if}
@@ -111,29 +122,41 @@
     border-top: 1px solid var(--border-light);
   }
 
-  .conversation-card:hover .conversation-card-prompt {
+  .conversation-card:hover .conversation-card-title {
     color: var(--accent);
   }
 
-  .conversation-card-prompt {
+  .conversation-card-title {
     margin: 0;
     font-family: var(--font-serif);
     font-size: 1.15rem;
-    font-weight: 500;
-    line-height: 1.45;
+    font-weight: 600;
+    line-height: 1.4;
     color: var(--text-strong);
-    white-space: pre-wrap;
     transition: color 160ms ease;
     display: -webkit-box;
-    -webkit-line-clamp: 4;
-    line-clamp: 4;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
 
-  .conversation-card-prompt-empty {
+  .conversation-card-title-empty {
     color: var(--muted);
     font-style: italic;
+    font-weight: 500;
+  }
+
+  .conversation-card-summary {
+    margin: 0;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    color: var(--muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .conversation-card-meta {
@@ -143,11 +166,6 @@
     gap: 0.55rem;
     font-size: 0.78rem;
     color: var(--muted);
-  }
-
-  .conversation-card-title {
-    font-weight: 600;
-    color: var(--text);
   }
 
   .conversation-card-time {
