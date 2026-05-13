@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import type { PageProps } from './$types';
+  import { NDKEvent, type NostrEvent } from '@nostr-dev-kit/ndk';
   import { ndk } from '$lib/ndk/client';
   import { User } from '$lib/ndk/ui/user';
   import { displayName } from '$lib/ndk/format';
@@ -8,6 +9,7 @@
   import ConversationCard from '$lib/components/ConversationCard.svelte';
   import {
     KIND_CONVERSATION_METADATA,
+    KIND_MESSAGE,
     parseConversationMetadata,
     type TenexConversationMeta
   } from '$lib/ndk/tenex';
@@ -16,6 +18,10 @@
 
   const project = $derived(data.project);
   const ownerProfile = $derived(project ? data.profiles?.[project.pubkey] : undefined);
+
+  const seedRootEvents = $derived(
+    (data.rootEvents ?? []).map((raw: NostrEvent) => new NDKEvent(ndk, raw))
+  );
 
   const liveConversations = ndk.$subscribe(() => {
     if (!browser || !project) return undefined;
@@ -26,7 +32,7 @@
     };
   });
 
-  const conversations = $derived.by<TenexConversationMeta[]>(() => {
+  const metadataByRoot = $derived.by<Map<string, TenexConversationMeta>>(() => {
     const byRoot = new Map<string, TenexConversationMeta>();
 
     for (const seed of data.conversations ?? []) {
@@ -42,7 +48,42 @@
       }
     }
 
-    return Array.from(byRoot.values()).sort((a, b) => b.updatedAt - a.updatedAt);
+    return byRoot;
+  });
+
+  const rootIds = $derived(Array.from(metadataByRoot.keys()));
+
+  const liveRootEvents = ndk.$subscribe(() => {
+    if (!browser || rootIds.length === 0) return undefined;
+    return {
+      filters: [{ kinds: [KIND_MESSAGE], ids: rootIds }]
+    };
+  });
+
+  const conversations = $derived.by(() => {
+    const byId = new Map<string, NDKEvent>();
+
+    for (const event of seedRootEvents) {
+      if (event.id) byId.set(event.id, event);
+    }
+
+    for (const event of liveRootEvents.events) {
+      if (!event.id) continue;
+      if (project && event.pubkey !== project.pubkey) continue;
+      byId.set(event.id, event);
+    }
+
+    const entries: Array<{ rootEvent: NDKEvent; metadata?: TenexConversationMeta }> = [];
+    for (const event of byId.values()) {
+      if (!event.id) continue;
+      entries.push({ rootEvent: event, metadata: metadataByRoot.get(event.id) });
+    }
+
+    return entries.sort((a, b) => {
+      const aTime = a.metadata?.updatedAt ?? a.rootEvent.created_at ?? 0;
+      const bTime = b.metadata?.updatedAt ?? b.rootEvent.created_at ?? 0;
+      return bTime - aTime;
+    });
   });
 </script>
 
@@ -87,8 +128,8 @@
         </p>
       {:else}
         <div class="conversation-list">
-          {#each conversations as conversation (conversation.rootId)}
-            <ConversationCard {conversation} />
+          {#each conversations as entry (entry.rootEvent.id)}
+            <ConversationCard rootEvent={entry.rootEvent} metadata={entry.metadata} />
           {/each}
         </div>
       {/if}

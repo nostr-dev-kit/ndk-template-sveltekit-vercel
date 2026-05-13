@@ -159,6 +159,12 @@ export async function fetchProjectConversations(
   return Array.from(byRoot.values()).sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+export async function fetchEventsByIds(ids: string[]): Promise<NDKEvent[]> {
+  if (ids.length === 0) return [];
+  const unique = Array.from(new Set(ids));
+  return fetchEvents({ ids: unique }, `fetchEventsByIds(${unique.length})`);
+}
+
 export async function fetchConversationBundle(rootId: string): Promise<{
   root?: NDKEvent;
   messages: NDKEvent[];
