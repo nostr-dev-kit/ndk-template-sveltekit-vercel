@@ -5,8 +5,7 @@ const FALLBACK_RELAYS = [
   'wss://relay.primal.net',
   'wss://relay.damus.io',
   'wss://purplepag.es',
-  'wss://nos.lol',
-  'wss://relay.nostr.band'
+  'wss://nos.lol'
 ];
 
 export const DEFAULT_RELAYS = parseRelayList(
