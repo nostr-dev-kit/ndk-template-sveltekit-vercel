@@ -1,12 +1,9 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import type { PageProps } from './$types';
   import { ndk } from '$lib/ndk/client';
   import ProjectCard from '$lib/components/ProjectCard.svelte';
   import { KIND_PROJECT, type TenexProject } from '$lib/ndk/tenex';
   import { mergeProjects } from '$lib/ndk/mergeProjects';
-
-  let { data }: PageProps = $props();
 
   const liveProjects = ndk.$subscribe(() => {
     if (!browser) return undefined;
@@ -16,7 +13,7 @@
   });
 
   const projects = $derived.by<TenexProject[]>(() =>
-    mergeProjects(data.projects, liveProjects.events)
+    mergeProjects([], liveProjects.events)
   );
 </script>
 
@@ -37,7 +34,7 @@
   {:else}
     <div class="projects-grid">
       {#each projects as project (project.address)}
-        <ProjectCard {project} ownerProfile={data.profiles?.[project.pubkey]} />
+        <ProjectCard {project} />
       {/each}
     </div>
   {/if}

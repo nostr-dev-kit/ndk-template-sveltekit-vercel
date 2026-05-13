@@ -1,21 +1,15 @@
 import NDK, {
-  NDKEvent,
-  type NDKFilter,
   NDKPrivateKeySigner,
   type NDKRelay,
-  NDKSubscriptionCacheUsage,
   type NDKUser,
-  type NDKUserProfile,
-  profileFromEvent
+  type NDKUserProfile
 } from '@nostr-dev-kit/ndk';
 import { APP_NAME, DEFAULT_RELAYS } from '$lib/ndk/config';
 import { createRelayAuthEvent } from '$lib/ndk/auth';
 import { getServerCacheAdapter } from '$lib/server/ndk-cache';
 
 const CONNECT_TIMEOUT_MS = 2500;
-const CACHE_FETCH_TIMEOUT_MS = 800;
 const FETCH_TIMEOUT_MS = 2500;
-const FRONT_PAGE_FETCH_TIMEOUT_MS = 6000;
 const clients = new Map<string, ServerNdkClient>();
 
 type ServerNdkClient = {
@@ -67,49 +61,6 @@ function getServerNdkClient(relays: readonly string[] = DEFAULT_RELAYS): ServerN
   return client;
 }
 
-async function fetchEventsForSsr(
-  filters: NDKFilter | NDKFilter[],
-  label: string,
-  timeoutMs = FETCH_TIMEOUT_MS
-): Promise<Set<NDKEvent> | undefined> {
-  const ndk = await getServerNdk(DEFAULT_RELAYS, { connect: false });
-  const cachedEvents = await fetchEventsFromCache(ndk, filters, label);
-
-  if (cachedEvents && cachedEvents.size > 0) {
-    return cachedEvents;
-  }
-
-  await getServerNdk();
-
-  return withTimeoutMs(
-    ndk.fetchEvents(filters, {
-      closeOnEose: true,
-      cacheUsage: NDKSubscriptionCacheUsage.ONLY_RELAY
-    }),
-    undefined,
-    label,
-    timeoutMs
-  );
-}
-
-async function fetchEventsFromCache(
-  ndk: NDK,
-  filters: NDKFilter | NDKFilter[],
-  label: string
-): Promise<Set<NDKEvent> | undefined> {
-  if (!ndk.cacheAdapter) return undefined;
-
-  return withTimeoutMs(
-    ndk.fetchEvents(filters, {
-      closeOnEose: true,
-      cacheUsage: NDKSubscriptionCacheUsage.ONLY_CACHE
-    }),
-    undefined,
-    `${label}:cache`,
-    CACHE_FETCH_TIMEOUT_MS
-  );
-}
-
 export async function fetchUserWithProfile(identifier: string): Promise<{
   user?: NDKUser;
   profile?: NDKUserProfile;
@@ -128,46 +79,6 @@ export async function fetchUserWithProfile(identifier: string): Promise<{
     undefined;
 
   return { user, profile };
-}
-
-export async function fetchProfilesByPubkeys(
-  pubkeys: readonly string[],
-  timeoutMs = FRONT_PAGE_FETCH_TIMEOUT_MS
-): Promise<Record<string, NDKUserProfile>> {
-  const uniquePubkeys = [...new Set(pubkeys.map((pubkey) => pubkey.trim()).filter(Boolean))];
-
-  if (uniquePubkeys.length === 0) {
-    return {};
-  }
-
-  const profileEvents = Array.from(
-    (await fetchEventsForSsr(
-      {
-        kinds: [0],
-        authors: uniquePubkeys
-      },
-      `fetchProfilesByPubkeys(${uniquePubkeys.length})`,
-      timeoutMs
-    )) ?? []
-  );
-  const latestProfiles = new Map<string, NDKEvent>();
-
-  for (const event of profileEvents) {
-    const existing = latestProfiles.get(event.pubkey);
-    if (!existing || (event.created_at ?? 0) > (existing.created_at ?? 0)) {
-      latestProfiles.set(event.pubkey, event);
-    }
-  }
-
-  return Object.fromEntries(
-    Array.from(latestProfiles, ([pubkey, event]) => {
-      try {
-        return [pubkey, profileFromEvent(event)] as const;
-      } catch {
-        return undefined;
-      }
-    }).filter((entry): entry is readonly [string, NDKUserProfile] => Boolean(entry))
-  );
 }
 
 async function withTimeout<T>(promise: Promise<T>, fallback: T, label: string): Promise<T> {

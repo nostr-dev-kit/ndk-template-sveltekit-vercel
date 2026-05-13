@@ -1,21 +1,16 @@
 <script lang="ts">
-  import type { NDKUserProfile } from '@nostr-dev-kit/ndk';
   import { ndk } from '$lib/ndk/client';
   import { User } from '$lib/ndk/ui/user';
-  import { displayName } from '$lib/ndk/format';
   import type { TenexProject } from '$lib/ndk/tenex';
 
   interface Props {
     project: TenexProject;
-    ownerProfile?: NDKUserProfile;
   }
 
-  let { project, ownerProfile }: Props = $props();
+  let { project }: Props = $props();
 
-  const ownerName = $derived(
-    displayName(ownerProfile, `${project.pubkey.slice(0, 8)}…`)
-  );
   const agentCount = $derived(project.agents.length);
+  const ownerFallback = $derived(`${project.pubkey.slice(0, 8)}…`);
 </script>
 
 <a class="project-card" href={`/p/${project.naddr}`}>
@@ -27,10 +22,12 @@
   </div>
 
   <div class="project-card-meta">
-    <User.Root {ndk} pubkey={project.pubkey} profile={ownerProfile}>
+    <User.Root {ndk} pubkey={project.pubkey}>
       <span class="project-card-owner">
         <User.Avatar class="project-card-avatar" />
-        <span class="project-card-owner-name">{ownerName}</span>
+        <span class="project-card-owner-name">
+          <User.Name fallback={ownerFallback} />
+        </span>
       </span>
     </User.Root>
     <span class="project-card-agents">

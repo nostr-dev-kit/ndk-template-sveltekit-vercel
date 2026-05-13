@@ -1,10 +1,9 @@
-import type { NDKEvent, NDKFilter, NostrEvent } from '@nostr-dev-kit/ndk';
+import type { NDKEvent, NDKFilter } from '@nostr-dev-kit/ndk';
 import { NDKSubscriptionCacheUsage } from '@nostr-dev-kit/ndk';
 import { DEFAULT_RELAYS } from '$lib/ndk/config';
 import { getServerNdk } from '$lib/server/nostr';
 import {
   KIND_CONVERSATION_METADATA,
-  KIND_MESSAGE,
   KIND_PROJECT,
   parseConversationMetadata,
   parseProjectEvent,
@@ -136,59 +135,23 @@ export async function fetchTenexProjectByAddress(
   return parseProjectEvent(sorted[0]);
 }
 
-export async function fetchProjectConversations(
-  projectAddress: string,
-  limit = 300
-): Promise<TenexConversationMeta[]> {
-  const events = await fetchEvents(
-    { kinds: [KIND_CONVERSATION_METADATA as number], '#a': [projectAddress], limit },
-    `fetchProjectConversations(${projectAddress})`
-  );
-
-  const byRoot = new Map<string, TenexConversationMeta>();
-  for (const event of events) {
-    const meta = parseConversationMetadata(event);
-    if (!meta) continue;
-
-    const existing = byRoot.get(meta.rootId);
-    if (!existing || meta.updatedAt > existing.updatedAt) {
-      byRoot.set(meta.rootId, meta);
-    }
-  }
-
-  return Array.from(byRoot.values()).sort((a, b) => b.updatedAt - a.updatedAt);
-}
-
-export async function fetchEventsByIds(ids: string[]): Promise<NDKEvent[]> {
-  if (ids.length === 0) return [];
-  const unique = Array.from(new Set(ids));
-  const key = unique.slice().sort().join(',');
-  return fetchEvents({ ids: unique }, `fetchEventsByIds(${key})`);
-}
-
-export async function fetchConversationBundle(rootId: string): Promise<{
+export async function fetchConversationHead(rootId: string): Promise<{
   root?: NDKEvent;
-  messages: NDKEvent[];
   meta?: TenexConversationMeta;
 }> {
   const filters: NDKFilter[] = [
     { ids: [rootId] },
-    { kinds: [KIND_MESSAGE], '#e': [rootId], limit: 500 },
     { kinds: [KIND_CONVERSATION_METADATA as number], '#e': [rootId], limit: 20 }
   ];
 
-  const events = await fetchEvents(filters, `fetchConversationBundle(${rootId})`);
+  const events = await fetchEvents(filters, `fetchConversationHead(${rootId})`);
 
   let root: NDKEvent | undefined;
-  const messages: NDKEvent[] = [];
   const metaEvents: NDKEvent[] = [];
 
   for (const event of events) {
     if (event.id === rootId) {
       root = event;
-      if (event.kind === KIND_MESSAGE) messages.push(event);
-    } else if (event.kind === KIND_MESSAGE) {
-      messages.push(event);
     } else if (event.kind === KIND_CONVERSATION_METADATA) {
       metaEvents.push(event);
     }
@@ -200,13 +163,8 @@ export async function fetchConversationBundle(rootId: string): Promise<{
 
   return {
     root,
-    messages,
     meta: metaEvent ? parseConversationMetadata(metaEvent) : undefined
   };
-}
-
-export function rawEventList(events: NDKEvent[]): NostrEvent[] {
-  return events.map((event) => event.rawEvent() as NostrEvent);
 }
 
 async function withTimeout<T>(

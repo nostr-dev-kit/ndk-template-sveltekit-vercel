@@ -3,7 +3,6 @@
   import { ndk } from '$lib/ndk/client';
   import { User } from '$lib/ndk/ui/user';
   import { MarkdownEventContent } from '$lib/ndk/ui/markdown-event-content';
-  import { displayName } from '$lib/ndk/format';
   import { relativeTime, type TenexAgent } from '$lib/ndk/tenex';
 
   interface Props {

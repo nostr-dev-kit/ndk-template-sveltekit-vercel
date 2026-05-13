@@ -1,10 +1,8 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import type { PageProps } from './$types';
-  import { NDKEvent, type NostrEvent } from '@nostr-dev-kit/ndk';
   import { ndk } from '$lib/ndk/client';
   import MessageBlock from '$lib/components/MessageBlock.svelte';
-  import { mergeUniqueEvents } from '$lib/ndk/events';
   import {
     KIND_CONVERSATION_METADATA,
     KIND_MESSAGE,
@@ -13,14 +11,11 @@
     relativeTime,
     sortMessagesChronologically
   } from '$lib/ndk/tenex';
+  import type { NDKEvent } from '@nostr-dev-kit/ndk';
 
   let { data }: PageProps = $props();
 
   const rootId = $derived(data.rootId);
-  const seedRoot = $derived(data.root ? new NDKEvent(ndk, data.root) : undefined);
-  const seedMessages = $derived(
-    (data.messages ?? []).map((raw: NostrEvent) => new NDKEvent(ndk, raw))
-  );
 
   const liveMessages = ndk.$subscribe(() => {
     if (!browser || !rootId) return undefined;
@@ -52,17 +47,13 @@
 
   const project = $derived(data.project);
 
-  const allMessages = $derived.by(() => {
-    const merged = mergeUniqueEvents(
+  const allMessages = $derived.by(() =>
+    sortMessagesChronologically(
       liveMessages.events.filter(
         (event) => event.kind === KIND_MESSAGE && (event.id === rootId || hasRootETag(event, rootId))
-      ),
-      seedMessages
-    );
-    return sortMessagesChronologically(
-      merged.length > 0 ? merged : seedRoot ? [seedRoot] : merged
-    );
-  });
+      )
+    )
+  );
 
   function hasRootETag(event: NDKEvent, id: string): boolean {
     return event.tags.some((tag) => tag[0] === 'e' && tag[1] === id);

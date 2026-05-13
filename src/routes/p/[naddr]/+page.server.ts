@@ -1,12 +1,5 @@
-import type { NostrEvent } from '@nostr-dev-kit/ndk';
 import type { PageServerLoad } from './$types';
-import { fetchProfilesByPubkeys } from '$lib/server/nostr';
-import {
-  fetchEventsByIds,
-  fetchProjectConversations,
-  fetchTenexProjectByAddress,
-  rawEventList
-} from '$lib/server/tenex';
+import { fetchTenexProjectByAddress } from '$lib/server/tenex';
 import { decodeProjectNaddr } from '$lib/ndk/tenex';
 import { buildMissingSeo, buildProjectSeo } from '$lib/seo';
 
@@ -36,25 +29,10 @@ export const load: PageServerLoad = async ({ params, setHeaders, url }) => {
       };
     }
 
-    const [conversations, profiles] = await Promise.all([
-      fetchProjectConversations(project.address),
-      fetchProfilesByPubkeys([project.pubkey, ...project.agents.map((agent) => agent.pubkey)])
-    ]);
-
-    const rootIds = conversations.map((meta) => meta.rootId);
-    const rootEvents = await fetchEventsByIds(rootIds);
-    const ownedRootEvents = rootEvents.filter((event) => event.pubkey === project.pubkey);
-    const rawRootEvents: NostrEvent[] = rawEventList(ownedRootEvents);
-    const ownedRootIds = new Set(ownedRootEvents.map((event) => event.id));
-    const ownedConversations = conversations.filter((meta) => ownedRootIds.has(meta.rootId));
-
     return {
       missing: false,
       naddr: params.naddr,
       project,
-      conversations: ownedConversations,
-      rootEvents: rawRootEvents,
-      profiles,
       seo: buildProjectSeo({
         url,
         title: project.title,

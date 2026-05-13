@@ -1,7 +1,6 @@
 import type { NostrEvent } from '@nostr-dev-kit/ndk';
 import type { PageServerLoad } from './$types';
-import { fetchProfilesByPubkeys } from '$lib/server/nostr';
-import { fetchConversationBundle, fetchTenexProjectByAddress, rawEventList } from '$lib/server/tenex';
+import { fetchConversationHead, fetchTenexProjectByAddress } from '$lib/server/tenex';
 import { KIND_PROJECT, parseProjectAddress } from '$lib/ndk/tenex';
 import { buildConversationSeo, buildMissingSeo } from '$lib/seo';
 
@@ -11,9 +10,9 @@ export const load: PageServerLoad = async ({ params, setHeaders, url }) => {
   });
 
   try {
-    const { root, messages, meta } = await fetchConversationBundle(params.id);
+    const { root, meta } = await fetchConversationHead(params.id);
 
-    if (!root && messages.length === 0 && !meta) {
+    if (!root && !meta) {
       return {
         missing: true,
         rootId: params.id,
@@ -32,30 +31,17 @@ export const load: PageServerLoad = async ({ params, setHeaders, url }) => {
         ? await fetchTenexProjectByAddress(projectRef.pubkey, projectRef.dTag)
         : undefined;
 
-    const messagePubkeys = new Set<string>();
-    if (root) messagePubkeys.add(root.pubkey);
-    for (const message of messages) messagePubkeys.add(message.pubkey);
-    if (project) {
-      messagePubkeys.add(project.pubkey);
-      for (const agent of project.agents) messagePubkeys.add(agent.pubkey);
-    }
-
-    const profiles = await fetchProfilesByPubkeys(Array.from(messagePubkeys));
-
     const title = meta?.title || (project ? `Conversation in ${project.title}` : 'Conversation');
     const summary = meta?.summary || '';
 
     const rawRoot = root ? (root.rawEvent() as NostrEvent) : undefined;
-    const rawMessages = rawEventList(messages);
 
     return {
       missing: false,
       rootId: params.id,
       root: rawRoot,
-      messages: rawMessages,
       meta: meta ?? undefined,
       project: project ?? undefined,
-      profiles,
       seo: buildConversationSeo({
         url,
         title,

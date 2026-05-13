@@ -11,9 +11,10 @@
 
   interface Props {
     rootId: string;
+    expectedAuthor?: string;
   }
 
-  let { rootId }: Props = $props();
+  let { rootId, expectedAuthor }: Props = $props();
 
   const rootSubscription = ndk.$subscribe(() => {
     if (!browser || !rootId) return undefined;
@@ -68,6 +69,10 @@
 
   const timestamp = $derived(metadata?.updatedAt ?? rootEvent?.created_at ?? 0);
 
+  const shouldShow = $derived(
+    !expectedAuthor || (rootEvent !== undefined && rootEvent.pubkey === expectedAuthor)
+  );
+
   const statusVariant = $derived.by(() => {
     const label = metadata?.statusLabel?.toLowerCase() ?? '';
     if (!label) return '';
@@ -84,6 +89,7 @@
   });
 </script>
 
+{#if shouldShow}
 <a class="conversation-card" href={`/c/${rootId}`}>
   {#if displayTitle}
     <h3 class="conversation-card-title">{displayTitle}</h3>
@@ -107,6 +113,7 @@
     <span class="conversation-card-time">{relativeTime(timestamp)}</span>
   </div>
 </a>
+{/if}
 
 <style>
   .conversation-card {

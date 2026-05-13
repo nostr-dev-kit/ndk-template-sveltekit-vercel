@@ -1,89 +1,55 @@
 <script lang="ts">
   import { browser } from '$app/environment';
   import type { PageProps } from './$types';
-  import { NDKEvent, type NostrEvent } from '@nostr-dev-kit/ndk';
   import { ndk } from '$lib/ndk/client';
   import { User } from '$lib/ndk/ui/user';
-  import { displayName } from '$lib/ndk/format';
   import AgentRoster from '$lib/components/AgentRoster.svelte';
   import ConversationCard from '$lib/components/ConversationCard.svelte';
   import {
     KIND_CONVERSATION_METADATA,
     KIND_MESSAGE,
-    parseConversationMetadata,
-    type TenexConversationMeta
+    parseConversationMetadata
   } from '$lib/ndk/tenex';
 
   let { data }: PageProps = $props();
 
   const project = $derived(data.project);
-  const ownerProfile = $derived(project ? data.profiles?.[project.pubkey] : undefined);
 
-  const seedRootEvents = $derived(
-    (data.rootEvents ?? []).map((raw: NostrEvent) => new NDKEvent(ndk, raw))
-  );
-
-  const liveConversations = ndk.$subscribe(() => {
+  const conversationDiscovery = ndk.$subscribe(() => {
     if (!browser || !project) return undefined;
     return {
       filters: [
-        { kinds: [KIND_CONVERSATION_METADATA as number], '#a': [project.address], limit: 100 }
+        { kinds: [KIND_CONVERSATION_METADATA as number], '#a': [project.address], limit: 100 },
+        {
+          kinds: [KIND_MESSAGE],
+          '#a': [project.address],
+          authors: [project.pubkey],
+          limit: 100
+        }
       ]
     };
   });
 
-  const metadataByRoot = $derived.by<Map<string, TenexConversationMeta>>(() => {
-    const byRoot = new Map<string, TenexConversationMeta>();
-
-    for (const seed of data.conversations ?? []) {
-      byRoot.set(seed.rootId, seed);
-    }
-
-    for (const event of liveConversations.events) {
-      const meta = parseConversationMetadata(event);
-      if (!meta) continue;
-      const existing = byRoot.get(meta.rootId);
-      if (!existing || meta.updatedAt > existing.updatedAt) {
-        byRoot.set(meta.rootId, meta);
-      }
-    }
-
-    return byRoot;
-  });
-
-  const rootIds = $derived(Array.from(metadataByRoot.keys()));
-
-  const liveRootEvents = ndk.$subscribe(() => {
-    if (!browser || rootIds.length === 0) return undefined;
-    return {
-      filters: [{ kinds: [KIND_MESSAGE], ids: rootIds }]
-    };
-  });
-
   const conversations = $derived.by(() => {
-    const byId = new Map<string, NDKEvent>();
-
-    for (const event of seedRootEvents) {
-      if (event.id) byId.set(event.id, event);
+    const lastSeen = new Map<string, number>();
+    for (const event of conversationDiscovery.events) {
+      let rootId: string | undefined;
+      let ts = event.created_at ?? 0;
+      if (event.kind === KIND_CONVERSATION_METADATA) {
+        const meta = parseConversationMetadata(event);
+        if (!meta) continue;
+        rootId = meta.rootId;
+        ts = meta.updatedAt;
+      } else if (event.kind === KIND_MESSAGE && event.id) {
+        rootId = event.id;
+      }
+      if (!rootId) continue;
+      const existing = lastSeen.get(rootId) ?? 0;
+      if (ts > existing) lastSeen.set(rootId, ts);
     }
-
-    for (const event of liveRootEvents.events) {
-      if (!event.id) continue;
-      if (project && event.pubkey !== project.pubkey) continue;
-      byId.set(event.id, event);
-    }
-
-    const entries: Array<{ rootEvent: NDKEvent; metadata?: TenexConversationMeta }> = [];
-    for (const event of byId.values()) {
-      if (!event.id) continue;
-      entries.push({ rootEvent: event, metadata: metadataByRoot.get(event.id) });
-    }
-
-    return entries.sort((a, b) => {
-      const aTime = a.metadata?.updatedAt ?? a.rootEvent.created_at ?? 0;
-      const bTime = b.metadata?.updatedAt ?? b.rootEvent.created_at ?? 0;
-      return bTime - aTime;
-    });
+    return Array.from(lastSeen.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([rootId]) => rootId);
   });
 </script>
 
@@ -100,11 +66,11 @@
       <span class="eyebrow eyebrow-blue">Project</span>
       <h1 class="project-title">{project.title}</h1>
 
-      <User.Root {ndk} pubkey={project.pubkey} profile={ownerProfile}>
+      <User.Root {ndk} pubkey={project.pubkey}>
         <a class="project-owner" href={`/profile/${project.pubkey}`}>
           <User.Avatar class="project-owner-avatar" />
           <span class="project-owner-name">
-            {displayName(ownerProfile, `${project.pubkey.slice(0, 8)}…`)}
+            <User.Name fallback={`${project.pubkey.slice(0, 8)}…`} />
           </span>
         </a>
       </User.Root>
@@ -124,12 +90,12 @@
 
       {#if conversations.length === 0}
         <p class="muted">
-          {browser ? 'No conversations yet for this project.' : 'No conversations found.'}
+          {browser ? 'Looking for conversations…' : 'No conversations found.'}
         </p>
       {:else}
         <div class="conversation-list">
-          {#each conversations as entry (entry.rootEvent.id)}
-            <ConversationCard rootEvent={entry.rootEvent} metadata={entry.metadata} />
+          {#each conversations as rootId (rootId)}
+            <ConversationCard {rootId} expectedAuthor={project.pubkey} />
           {/each}
         </div>
       {/if}
