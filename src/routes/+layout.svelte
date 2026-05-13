@@ -6,7 +6,7 @@
   import AuthPanel from '$lib/features/auth/AuthPanel.svelte';
   import SiteNavigation from '$lib/components/SiteNavigation.svelte';
   import SeoHead from '$lib/components/SeoHead.svelte';
-  import { ndk, ensureClientNdk } from '$lib/ndk/client';
+  import { ndk, ensureClientNdk, reauthProtectedRelays } from '$lib/ndk/client';
   import type { SeoMetadata } from '$lib/seo';
   import { NDK_CONTEXT_KEY } from '$lib/ndk/utils/ndk';
 
@@ -19,6 +19,21 @@
     void ensureClientNdk().catch((error) => {
       console.error('Failed to connect client NDK', error);
     });
+  });
+
+  let trackedPubkey: string | undefined;
+  let pubkeyTracked = false;
+
+  $effect(() => {
+    const pubkey = ndk.$currentUser?.pubkey;
+    if (!pubkeyTracked) {
+      pubkeyTracked = true;
+      trackedPubkey = pubkey;
+      return;
+    }
+    if (pubkey === trackedPubkey) return;
+    trackedPubkey = pubkey;
+    void reauthProtectedRelays();
   });
 </script>
 
