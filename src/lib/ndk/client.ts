@@ -1,8 +1,34 @@
 import { browser } from '$app/environment';
-import { NDKBlossomList, NDKInterestList } from '@nostr-dev-kit/ndk';
+import {
+  NDKBlossomList,
+  NDKEvent,
+  NDKInterestList,
+  NDKKind,
+  NDKPrivateKeySigner,
+  type NDKRelay
+} from '@nostr-dev-kit/ndk';
 import { createNDK } from '@nostr-dev-kit/svelte';
 import { LocalStorage } from '@nostr-dev-kit/sessions';
 import { APP_NAME, DEFAULT_RELAYS } from '$lib/ndk/config';
+
+const EPHEMERAL_KEY = 'open-prompt:ephemeral-key';
+let ephemeralSigner: NDKPrivateKeySigner | undefined;
+
+function getEphemeralSigner(): NDKPrivateKeySigner {
+  if (ephemeralSigner) return ephemeralSigner;
+
+  const stored = browser ? sessionStorage.getItem(EPHEMERAL_KEY) : null;
+  if (stored) {
+    ephemeralSigner = new NDKPrivateKeySigner(stored);
+  } else {
+    ephemeralSigner = NDKPrivateKeySigner.generate();
+    if (browser) {
+      sessionStorage.setItem(EPHEMERAL_KEY, ephemeralSigner.privateKey);
+    }
+  }
+
+  return ephemeralSigner;
+}
 
 export const ndk = createNDK({
   explicitRelayUrls: DEFAULT_RELAYS,
@@ -20,6 +46,18 @@ export const ndk = createNDK({
     }
   }
 });
+
+ndk.relayAuthDefaultPolicy = async (relay: NDKRelay, challenge: string) => {
+  const signer = ndk.signer ?? getEphemeralSigner();
+  const event = new NDKEvent(ndk);
+  event.kind = NDKKind.ClientAuth;
+  event.tags = [
+    ['relay', relay.url],
+    ['challenge', challenge]
+  ];
+  await event.sign(signer);
+  return event;
+};
 
 let connectPromise: Promise<void> | null = null;
 

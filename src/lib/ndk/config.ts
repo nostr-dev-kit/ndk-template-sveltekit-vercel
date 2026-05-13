@@ -1,6 +1,7 @@
 export const APP_NAME = 'Open Prompt';
 
 const FALLBACK_RELAYS = [
+  'wss://relay.tenex.chat',
   'wss://relay.primal.net',
   'wss://relay.damus.io',
   'wss://purplepag.es',

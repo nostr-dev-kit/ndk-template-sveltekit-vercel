@@ -1,6 +1,9 @@
 import NDK, {
-  type NDKEvent,
+  NDKEvent,
   type NDKFilter,
+  NDKKind,
+  NDKPrivateKeySigner,
+  type NDKRelay,
   NDKSubscriptionCacheUsage,
   type NDKUser,
   type NDKUserProfile,
@@ -39,12 +42,24 @@ function getServerNdkClient(relays: readonly string[] = DEFAULT_RELAYS): ServerN
   if (existing) return existing;
 
   const cacheAdapter = getServerCacheAdapter();
+  const authSigner = NDKPrivateKeySigner.generate();
   const ndk = new NDK({
     explicitRelayUrls: [...relays],
     clientName: APP_NAME,
     enableOutboxModel: false,
     ...(cacheAdapter ? { cacheAdapter } : {})
   });
+
+  ndk.relayAuthDefaultPolicy = async (relay: NDKRelay, challenge: string) => {
+    const event = new NDKEvent(ndk);
+    event.kind = NDKKind.ClientAuth;
+    event.tags = [
+      ['relay', relay.url],
+      ['challenge', challenge]
+    ];
+    await event.sign(authSigner);
+    return event;
+  };
 
   const client: ServerNdkClient = {
     ndk,
