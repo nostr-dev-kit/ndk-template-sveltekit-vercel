@@ -9,7 +9,7 @@
 
   let { rootEvent, metadata }: Props = $props();
 
-  function sanitizePrompt(value: string): string {
+  function normalizePromptPreview(value: string): string {
     let out = '';
     for (let i = 0; i < value.length; i++) {
       const code = value.charCodeAt(i);
@@ -24,13 +24,9 @@
     return out.replace(/\n{3,}/g, '\n\n').trim();
   }
 
-  const promptText = $derived(sanitizePrompt(rootEvent.content ?? ''));
+  const promptText = $derived(normalizePromptPreview(rootEvent.content ?? ''));
 
-  const displayTitle = $derived.by(() => {
-    const title = metadata?.title;
-    if (!title || title === 'Untitled conversation') return undefined;
-    return title;
-  });
+  const displayTitle = $derived(metadata?.title || undefined);
 
   const timestamp = $derived(metadata?.updatedAt ?? rootEvent.created_at ?? 0);
 

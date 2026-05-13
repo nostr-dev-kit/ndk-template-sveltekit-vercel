@@ -133,7 +133,7 @@ export function parseConversationMetadata(
   return {
     rootId,
     projectAddress,
-    title: cleanText(tagValue(tags, 'title')) || 'Untitled conversation',
+    title: cleanText(tagValue(tags, 'title')) || '',
     summary: cleanText(tagValue(tags, 'summary')) || '',
     statusLabel: cleanText(tagValue(tags, 'status-label')) || undefined,
     statusActivity: cleanText(tagValue(tags, 'status-current-activity')) || undefined,

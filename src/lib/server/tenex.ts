@@ -138,7 +138,7 @@ export async function fetchTenexProjectByAddress(
 
 export async function fetchProjectConversations(
   projectAddress: string,
-  limit = 80
+  limit = 300
 ): Promise<TenexConversationMeta[]> {
   const events = await fetchEvents(
     { kinds: [KIND_CONVERSATION_METADATA as number], '#a': [projectAddress], limit },
@@ -162,7 +162,8 @@ export async function fetchProjectConversations(
 export async function fetchEventsByIds(ids: string[]): Promise<NDKEvent[]> {
   if (ids.length === 0) return [];
   const unique = Array.from(new Set(ids));
-  return fetchEvents({ ids: unique }, `fetchEventsByIds(${unique.length})`);
+  const key = unique.slice().sort().join(',');
+  return fetchEvents({ ids: unique }, `fetchEventsByIds(${key})`);
 }
 
 export async function fetchConversationBundle(rootId: string): Promise<{
